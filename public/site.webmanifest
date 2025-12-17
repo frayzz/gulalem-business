@@ -1,0 +1,28 @@
+{
+    "name": "Gulalem Business",
+    "short_name": "Gulalem",
+    "description": "CRM, склад и касса для цветочного магазина. Мобайл и ПК интерфейсы в одном PWA.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#0c0a08",
+    "theme_color": "#ff642f",
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        },
+        {
+            "src": "/apple-touch-icon.png",
+            "sizes": "180x180",
+            "type": "image/png"
+        },
+        {
+            "src": "/favicon.ico",
+            "sizes": "48x48",
+            "type": "image/x-icon"
+        }
+    ]
+}

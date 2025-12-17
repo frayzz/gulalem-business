@@ -975,7 +975,7 @@ export default function Dashboard() {
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
                                             <Badge variant="secondary">Автосписание</Badge>
-                                            <span className="text-sm font-semibold">Заказ #{autoWriteOff.order}</span>
+                                            <span className="text-sm font-semibold">Заказ #{state.autoWriteOff.order}</span>
                                         </div>
                                         <p className="text-sm text-muted-foreground">
                                             Рецепт букета разложен на 3 партии, старшие списаны первыми. Любые отрицательные остатки подсвечиваются.

@@ -106,6 +106,31 @@ const flows = [
     },
 ];
 
+const seo = {
+    title: 'Gulalem Business — CRM для цветочного магазина',
+    description:
+        'PWA, склад по партиям и касса в одном интерфейсе. Принимайте заказы за 2–3 действия, списывайте по FIFO и контролируйте маржу без Excel.',
+    url: '/',
+    image: '/logo.svg',
+};
+
+const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Gulalem Business',
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    url: seo.url,
+    image: seo.image,
+    description: seo.description,
+    offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'RUB',
+    },
+    featureList: pillars.map((pillar) => pillar.title),
+};
+
 export default function Welcome({
     canRegister = true,
 }: {
@@ -115,12 +140,28 @@ export default function Welcome({
 
     return (
         <>
-            <Head title="Gulalem Business — CRM для цветочного магазина">
+            <Head title={seo.title}>
+                <meta name="description" content={seo.description} />
+                <meta name="application-name" content="Gulalem Business" />
+                <meta name="keywords" content="CRM, цветочный бизнес, склад, касса, PWA" />
+                <meta property="og:type" content="website" />
+                <meta property="og:title" content={seo.title} />
+                <meta property="og:description" content={seo.description} />
+                <meta property="og:url" content={seo.url} />
+                <meta property="og:site_name" content="Gulalem Business" />
+                <meta property="og:image" content={seo.image} />
+                <meta name="twitter:card" content="summary_large_image" />
+                <meta name="twitter:title" content={seo.title} />
+                <meta name="twitter:description" content={seo.description} />
+                <link rel="canonical" href={seo.url} />
                 <link rel="preconnect" href="https://fonts.bunny.net" />
                 <link
                     href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700"
                     rel="stylesheet"
                 />
+                <script type="application/ld+json">
+                    {JSON.stringify(jsonLd)}
+                </script>
             </Head>
 
             <div className="relative min-h-screen bg-gradient-to-b from-white via-[#fdf6f0] to-white text-neutral-900 dark:from-[#0e0b08] dark:via-[#0f0b08] dark:to-[#0c0a08]">

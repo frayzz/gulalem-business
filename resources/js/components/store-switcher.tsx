@@ -46,7 +46,6 @@ export function StoreSwitcher() {
                 preserveScroll: true,
                 onSuccess: () =>
                     router.reload({
-                        only: ['stores', 'currentStoreId', 'currentStore'],
                         preserveScroll: true,
                     }),
                 onFinish: () => setPendingStoreId(null),

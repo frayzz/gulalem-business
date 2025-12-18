@@ -200,7 +200,7 @@ export default function OrdersIndex({ orders, products, auth }: OrdersPageProps)
             clearTimeout(handle);
             controller.abort();
         };
-    }, [orderForm]);
+    }, [orderForm.data.customer_phone]);
 
     return (
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>

@@ -51,3 +51,4 @@ export const dashboard = createRoute('/dashboard');
 export const login = createRoute('/login');
 export const register = createRoute('/register');
 export const logout = createRoute('/logout', 'post');
+export const switchStore = createRoute('/stores/switch', 'post');

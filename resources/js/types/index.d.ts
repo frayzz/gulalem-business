@@ -22,11 +22,20 @@ export interface NavItem {
     isActive?: boolean;
 }
 
+export interface Store {
+    id: number;
+    name: string;
+    city?: string;
+    status?: string;
+}
+
 export interface SharedData {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
     sidebarOpen: boolean;
+    stores?: Store[];
+    currentStoreId?: number | null;
     [key: string]: unknown;
 }
 

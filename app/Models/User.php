@@ -57,4 +57,14 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Role::class)->withTimestamps();
     }
+
+    /**
+     * Проверяет наличие хотя бы одной из запрошенных ролей.
+     *
+     * @param  string[]  $roles
+     */
+    public function hasRole(array $roles): bool
+    {
+        return $this->roles()->whereIn('name', $roles)->exists();
+    }
 }

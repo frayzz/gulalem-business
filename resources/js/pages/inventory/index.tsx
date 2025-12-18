@@ -48,6 +48,8 @@ function formatDate(value?: string | null) {
 export default function InventoryIndex({ batches, recipes, auth }: InventoryPageProps) {
     const batchForm = useForm({
         product_name: '',
+        product_price: '',
+        buy_price: '',
         quantity: '',
         arrived_at: '',
         expires_at: '',
@@ -55,6 +57,7 @@ export default function InventoryIndex({ batches, recipes, auth }: InventoryPage
 
     const recipeForm = useForm({
         bouquet_name: '',
+        bouquet_price: '',
         items: [{ name: '', qty: '' }],
     });
 
@@ -69,7 +72,7 @@ export default function InventoryIndex({ batches, recipes, auth }: InventoryPage
         event.preventDefault();
         recipeForm.post('/inventory/recipes', {
             preserveScroll: true,
-            onSuccess: () => recipeForm.setData({ bouquet_name: '', items: [{ name: '', qty: '' }] }),
+            onSuccess: () => recipeForm.setData({ bouquet_name: '', bouquet_price: '', items: [{ name: '', qty: '' }] }),
         });
     };
 
@@ -130,6 +133,36 @@ export default function InventoryIndex({ batches, recipes, auth }: InventoryPage
                                 )}
                             </div>
                             <div className="space-y-2">
+                                <Label htmlFor="product_price">Цена продажи (за единицу)</Label>
+                                <Input
+                                    id="product_price"
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={batchForm.data.product_price}
+                                    onChange={(event) => batchForm.setData('product_price', event.target.value)}
+                                    required
+                                />
+                                {batchForm.errors.product_price && (
+                                    <p className="text-xs text-destructive">{batchForm.errors.product_price}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="buy_price">Закупочная цена (за единицу)</Label>
+                                <Input
+                                    id="buy_price"
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={batchForm.data.buy_price}
+                                    onChange={(event) => batchForm.setData('buy_price', event.target.value)}
+                                    required
+                                />
+                                {batchForm.errors.buy_price && (
+                                    <p className="text-xs text-destructive">{batchForm.errors.buy_price}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
                                 <Label htmlFor="arrived_at">Дата поступления</Label>
                                 <Input
                                     id="arrived_at"
@@ -184,6 +217,21 @@ export default function InventoryIndex({ batches, recipes, auth }: InventoryPage
                                 />
                                 {recipeForm.errors.bouquet_name && (
                                     <p className="text-xs text-destructive">{recipeForm.errors.bouquet_name}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="bouquet_price">Цена букета</Label>
+                                <Input
+                                    id="bouquet_price"
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={recipeForm.data.bouquet_price}
+                                    onChange={(event) => recipeForm.setData('bouquet_price', event.target.value)}
+                                    required
+                                />
+                                {recipeForm.errors.bouquet_price && (
+                                    <p className="text-xs text-destructive">{recipeForm.errors.bouquet_price}</p>
                                 )}
                             </div>
 

@@ -65,7 +65,7 @@ class OrderController extends Controller
             'total' => $validated['total'],
             'discount' => 0,
             'paid_total' => 0,
-            'payment_status' => PaymentService::STATUS_UNPAID,
+            'payment_status' => 'unpaid',
             'notes' => $validated['notes'] ?? null,
         ]);
 

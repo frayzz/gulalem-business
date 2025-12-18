@@ -7,7 +7,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
-import { Clock, Truck } from 'lucide-react';
+import { Clock, Plus, Trash2, Truck } from 'lucide-react';
 import { FormEvent } from 'react';
 
 interface OrdersPageProps extends PageProps {
@@ -15,7 +15,7 @@ interface OrdersPageProps extends PageProps {
         data: OrderResource[];
         links: { url: string | null; label: string; active: boolean }[];
     };
-    bouquets: BouquetResource[];
+    products: ProductResource[];
 }
 
 interface OrderResource {
@@ -29,11 +29,15 @@ interface OrderResource {
     delivery_time?: string | null;
 }
 
-interface BouquetResource {
+interface ProductResource {
     id: number;
     name: string;
+    type: string;
+    unit: string;
+    default_price?: string | null;
+    available_qty: number;
     bouquet_recipe?: {
-        items: { id: number; qty: string; product?: { name: string } | null }[];
+        items: { id: number; qty: string; product?: { id: number; name: string; unit: string } | null }[];
     } | null;
 }
 
@@ -82,13 +86,13 @@ function formatCurrency(value: string) {
     }).format(Number(value));
 }
 
-export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
+export default function OrdersIndex({ orders, products, auth }: OrdersPageProps) {
     const orderForm = useForm({
         customer_name: '',
         customer_phone: '',
         delivery_type: 'pickup',
-        total: '',
         notes: '',
+        items: [{ product_id: '', qty: '1', price: '' }],
     });
 
     const submitOrder = (event: FormEvent) => {
@@ -97,6 +101,34 @@ export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
             onSuccess: () => orderForm.reset(),
         });
     };
+
+    const addItem = () => {
+        orderForm.setData('items', [...orderForm.data.items, { product_id: '', qty: '1', price: '' }]);
+    };
+
+    const updateItem = (index: number, field: 'product_id' | 'qty' | 'price', value: string) => {
+        const next = [...orderForm.data.items];
+        next[index] = { ...next[index], [field]: value };
+
+        if (field === 'product_id') {
+            const product = products.find((item) => item.id === Number(value));
+            if (product?.default_price && !next[index].price) {
+                next[index].price = product.default_price.toString();
+            }
+        }
+
+        orderForm.setData('items', next);
+    };
+
+    const removeItem = (index: number) => {
+        const next = [...orderForm.data.items];
+        next.splice(index, 1);
+        orderForm.setData('items', next.length ? next : [{ product_id: '', qty: '1', price: '' }]);
+    };
+
+    const itemTotal = (qty: string, price: string) => Number(qty || 0) * Number(price || 0);
+
+    const orderTotal = orderForm.data.items.reduce((sum, item) => sum + itemTotal(item.qty, item.price), 0);
 
     const moveStatus = (orderId: number, status: string) => {
         router.post(
@@ -168,23 +200,124 @@ export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
                                     <p className="text-xs text-destructive">{orderForm.errors.delivery_type}</p>
                                 )}
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="total">Сумма</Label>
-                                <Input
-                                    id="total"
-                                    type="number"
-                                    min={0}
-                                    step="0.01"
-                                    value={orderForm.data.total}
-                                    onChange={(event) => orderForm.setData('total', event.target.value)}
-                                    required
-                                />
-                                {orderForm.errors.total && (
-                                    <p className="text-xs text-destructive">{orderForm.errors.total}</p>
+                            <div className="space-y-3 md:col-span-2">
+                                <div className="flex items-center justify-between">
+                                    <Label>Состав заказа</Label>
+                                    <button
+                                        type="button"
+                                        onClick={addItem}
+                                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                                    >
+                                        <Plus className="h-4 w-4" /> Добавить позицию
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {orderForm.data.items.map((item, index) => {
+                                        const product = products.find((candidate) => candidate.id === Number(item.product_id));
+
+                                        return (
+                                            <div
+                                                key={`${index}-${item.product_id || 'new'}`}
+                                                className="grid gap-3 md:grid-cols-[1.6fr_repeat(3,minmax(0,1fr))_auto] md:items-end"
+                                            >
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`product_${index}`}>Товар</Label>
+                                                    <select
+                                                        id={`product_${index}`}
+                                                        className="w-full rounded-md border px-3 py-2 text-sm"
+                                                        value={item.product_id}
+                                                        onChange={(event) =>
+                                                            updateItem(index, 'product_id', event.target.value)
+                                                        }
+                                                        required
+                                                    >
+                                                        <option value="">Выберите товар</option>
+                                                        {products.map((productOption) => (
+                                                            <option key={productOption.id} value={productOption.id}>
+                                                                {productOption.name} · {productOption.available_qty} {productOption.unit}
+                                                                {productOption.type === 'bouquet' ? ' (букет)' : ''}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    {orderForm.errors[`items.${index}.product_id`] && (
+                                                        <p className="text-xs text-destructive">
+                                                            {orderForm.errors[`items.${index}.product_id`]}
+                                                        </p>
+                                                    )}
+                                                    {product?.bouquet_recipe && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Рецепт: {product.bouquet_recipe.items.map((component) => {
+                                                                const name = component.product?.name ?? '—';
+                                                                return `${component.qty} ${component.product?.unit ?? ''} ${name}`;
+                                                            }).join(', ')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`qty_${index}`}>Количество</Label>
+                                                    <Input
+                                                        id={`qty_${index}`}
+                                                        type="number"
+                                                        min={0.001}
+                                                        step="0.001"
+                                                        value={item.qty}
+                                                        onChange={(event) => updateItem(index, 'qty', event.target.value)}
+                                                        required
+                                                    />
+                                                    {orderForm.errors[`items.${index}.qty`] && (
+                                                        <p className="text-xs text-destructive">
+                                                            {orderForm.errors[`items.${index}.qty`]}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`price_${index}`}>Цена</Label>
+                                                    <Input
+                                                        id={`price_${index}`}
+                                                        type="number"
+                                                        min={0}
+                                                        step="0.01"
+                                                        value={item.price}
+                                                        onChange={(event) => updateItem(index, 'price', event.target.value)}
+                                                        required
+                                                    />
+                                                    {orderForm.errors[`items.${index}.price`] && (
+                                                        <p className="text-xs text-destructive">
+                                                            {orderForm.errors[`items.${index}.price`]}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Сумма</Label>
+                                                    <div className="rounded-md border px-3 py-2 text-sm">
+                                                        {formatCurrency(itemTotal(item.qty, item.price).toString())}
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-end pb-1 md:pb-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeItem(index)}
+                                                        className="inline-flex h-9 items-center justify-center rounded-md border px-3 text-sm hover:bg-muted"
+                                                        aria-label="Удалить позицию"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {typeof orderForm.errors.items === 'string' && (
+                                    <p className="text-xs text-destructive">{orderForm.errors.items}</p>
                                 )}
                             </div>
                             <div className="space-y-2 md:col-span-2">
-                                <Label htmlFor="notes">Комментарий</Label>
+                                <Label className="flex items-center justify-between">
+                                    <span>Комментарий</span>
+                                    <span className="text-xs text-muted-foreground">Итого: {formatCurrency(orderTotal.toString())}</span>
+                                </Label>
                                 <textarea
                                     id="notes"
                                     className="min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"

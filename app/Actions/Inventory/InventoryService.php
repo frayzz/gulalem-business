@@ -270,7 +270,7 @@ class InventoryService
         return $total;
     }
 
-    protected function getAvailableQty(Product $product, ?int $orderId = null): float
+    public function getAvailableQty(Product $product, ?int $orderId = null): float
     {
         $stock = ProductBatch::where('product_id', $product->id)->sum('qty_left');
 

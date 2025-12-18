@@ -33,7 +33,10 @@ export function queryParams(params?: QueryParams): string {
     return queryString ? `?${queryString}` : '';
 }
 
-function createRoute(path: string, method: FormMethod = 'get'): RouteHelper {
+export function createRoute(
+    path: string,
+    method: FormMethod = 'get',
+): RouteHelper {
     const route = (params?: QueryParams) => `${path}${queryParams(params)}`;
 
     return Object.assign(route, {

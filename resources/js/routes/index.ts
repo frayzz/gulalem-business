@@ -53,7 +53,7 @@ export const register = createRoute('/register');
 export const logout = createRoute('/logout', 'post');
 export const switchStore = createRoute('/stores/switch', 'post');
 
-export default {
+const routes = {
     home,
     dashboard,
     login,
@@ -61,3 +61,5 @@ export default {
     logout,
     switchStore,
 };
+
+export default routes;

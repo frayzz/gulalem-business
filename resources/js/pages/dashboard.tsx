@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
 import {
     AlertTriangle,
@@ -19,7 +19,18 @@ import {
     Truck,
     Users,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 interface DashboardProps extends PageProps {
     orders: OrderResource[];
@@ -145,10 +156,31 @@ export default function Dashboard({
     inventoryAlerts,
 }: DashboardProps) {
     const [orderCards, setOrderCards] = useState<OrderResource[]>(orders);
+    const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+
+    const orderForm = useForm({
+        customer_name: '',
+        customer_phone: '',
+        delivery_type: 'pickup',
+        total: '',
+        notes: '',
+    });
 
     useEffect(() => {
         setOrderCards(orders);
     }, [orders]);
+
+    const submitOrder = (event: FormEvent) => {
+        event.preventDefault();
+
+        orderForm.post('/orders', {
+            preserveScroll: true,
+            onSuccess: () => {
+                orderForm.reset();
+                setCreateModalOpen(false);
+            },
+        });
+    };
 
     const summaryCards = [
         {
@@ -242,7 +274,7 @@ export default function Dashboard({
         );
 
         router.post(
-            `/api/orders/${id}/status`,
+            `/orders/${id}/status`,
             { status: next },
             {
                 preserveScroll: true,
@@ -283,9 +315,112 @@ export default function Dashboard({
                         <Button asChild variant="secondary">
                             <Link href="/inventory">Склад</Link>
                         </Button>
-                        <Button asChild>
-                            <Link href="/orders/create">Создать заказ</Link>
-                        </Button>
+                        <Dialog open={isCreateModalOpen} onOpenChange={setCreateModalOpen}>
+                            <DialogTrigger asChild>
+                                <Button>Создать заказ</Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-lg">
+                                <DialogHeader>
+                                    <DialogTitle>Быстрый заказ</DialogTitle>
+                                    <DialogDescription>
+                                        Добавьте имя клиента, контакт и сумму — заказ сразу появится в воронке.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <form className="space-y-4" onSubmit={submitOrder}>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="customer_name">Имя клиента</Label>
+                                            <Input
+                                                id="customer_name"
+                                                value={orderForm.data.customer_name}
+                                                onChange={(event) =>
+                                                    orderForm.setData('customer_name', event.target.value)
+                                                }
+                                                placeholder="Без имени"
+                                            />
+                                            {orderForm.errors.customer_name && (
+                                                <p className="text-xs text-destructive">{orderForm.errors.customer_name}</p>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="customer_phone">Телефон</Label>
+                                            <Input
+                                                id="customer_phone"
+                                                value={orderForm.data.customer_phone}
+                                                onChange={(event) =>
+                                                    orderForm.setData('customer_phone', event.target.value)
+                                                }
+                                                placeholder="+7 (999) 000-00-00"
+                                            />
+                                            {orderForm.errors.customer_phone && (
+                                                <p className="text-xs text-destructive">{orderForm.errors.customer_phone}</p>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="delivery_type">Тип доставки</Label>
+                                            <select
+                                                id="delivery_type"
+                                                className="w-full rounded-md border px-3 py-2 text-sm"
+                                                value={orderForm.data.delivery_type}
+                                                onChange={(event) => orderForm.setData('delivery_type', event.target.value)}
+                                            >
+                                                <option value="pickup">Самовывоз</option>
+                                                <option value="courier">Доставка</option>
+                                                <option value="shipping">Отправка</option>
+                                            </select>
+                                            {orderForm.errors.delivery_type && (
+                                                <p className="text-xs text-destructive">{orderForm.errors.delivery_type}</p>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="total">Сумма</Label>
+                                            <Input
+                                                id="total"
+                                                type="number"
+                                                min={0}
+                                                step="0.01"
+                                                value={orderForm.data.total}
+                                                onChange={(event) => orderForm.setData('total', event.target.value)}
+                                                required
+                                            />
+                                            {orderForm.errors.total && (
+                                                <p className="text-xs text-destructive">{orderForm.errors.total}</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="notes">Комментарий</Label>
+                                        <textarea
+                                            id="notes"
+                                            className="min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"
+                                            value={orderForm.data.notes}
+                                            onChange={(event) => orderForm.setData('notes', event.target.value)}
+                                            placeholder="Описание состава, пожелания, детали доставки"
+                                        />
+                                        {orderForm.errors.notes && (
+                                            <p className="text-xs text-destructive">{orderForm.errors.notes}</p>
+                                        )}
+                                    </div>
+
+                                    <DialogFooter className="gap-2 sm:gap-0">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setCreateModalOpen(false)}
+                                            className="sm:mr-auto"
+                                        >
+                                            Отмена
+                                        </Button>
+                                        <Button type="submit" disabled={orderForm.processing} className="gap-2">
+                                            <ClipboardList className="h-4 w-4" />
+                                            Добавить заказ
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 </div>
 

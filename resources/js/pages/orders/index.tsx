@@ -94,7 +94,7 @@ export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
 
     const moveStatus = (orderId: number, status: string) => {
         router.post(
-            `/api/orders/${orderId}/status`,
+            `/orders/${orderId}/status`,
             { status },
             {
                 preserveScroll: true,

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\CustomerController as ApiCustomerController;
 use App\Http\Controllers\Api\OrderController as ApiOrderController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\OrderController;
 use App\Models\Order;
@@ -21,6 +22,7 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('reports', ReportsController::class)->name('reports');
 
     Route::get('cash-desk', [CashDeskController::class, 'index'])->name('cash-desk.index');
     Route::post('cash-desk/payments', [CashDeskController::class, 'store'])->name('cash-desk.payments.store');

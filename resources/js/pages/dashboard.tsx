@@ -35,7 +35,6 @@ import { Input } from '@/components/ui/input';
 interface DashboardProps extends PageProps {
     orders: OrderResource[];
     inventory: InventoryResource[];
-    paymentsToday: number;
     ordersToday: number;
     completedToday: number;
     crmSummary: CrmSummary;
@@ -145,7 +144,6 @@ export default function Dashboard({
     auth,
     orders,
     inventory,
-    paymentsToday,
     ordersToday,
     completedToday,
     crmSummary,
@@ -178,27 +176,6 @@ export default function Dashboard({
             },
         });
     };
-
-    const summaryCards = [
-        {
-            title: 'Выручка сегодня',
-            value: formatCurrency(paymentsToday),
-            description: `${ordersToday} заказов за день`,
-            icon: Banknote,
-        },
-        {
-            title: 'Активные заказы',
-            value: orderCards.filter((order) => !['delivered', 'canceled'].includes(order.status)).length,
-            description: 'Всё, что ещё нужно довести до клиента',
-            icon: Timer,
-        },
-        {
-            title: 'Партии на складе',
-            value: inventory.length,
-            description: 'Отсортированы по сроку годности',
-            icon: PackageSearch,
-        },
-    ];
 
     const pipelineStatuses = useMemo(() => {
         const unique = new Set<PipelineStatus>([
@@ -419,20 +396,7 @@ export default function Dashboard({
                     </div>
                 </div>
 
-                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" id="reports">
-                    {summaryCards.map((card) => (
-                        <Card key={card.title} className="border-border/80">
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <div className="space-y-2">
-                                    <CardTitle className="text-sm text-muted-foreground">{card.title}</CardTitle>
-                                    <div className="text-2xl font-semibold">{card.value}</div>
-                                    <CardDescription>{card.description}</CardDescription>
-                                </div>
-                                <card.icon className="h-8 w-8 text-muted-foreground" />
-                            </CardHeader>
-                        </Card>
-                    ))}
-                </section>
+                
 
                 <section className="grid gap-4 lg:grid-cols-3" id="crm">
                     <Card className="border-border/80">

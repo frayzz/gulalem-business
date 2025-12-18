@@ -19,6 +19,7 @@ import {
     ClipboardList,
     Folder,
     LayoutGrid,
+    LineChart,
     PackageSearch,
     Receipt,
     Users,
@@ -50,6 +51,11 @@ const mainNavItems: NavItem[] = [
         title: 'Клиенты',
         href: '/customers',
         icon: Users,
+    },
+    {
+        title: 'Отчёты',
+        href: '/reports',
+        icon: LineChart,
     },
     {
         title: 'Комменты',

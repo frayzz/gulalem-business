@@ -6,11 +6,11 @@ use App\Services\DashboardData;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class DashboardController extends Controller
+class ReportsController extends Controller
 {
     public function __invoke(): Response
     {
-        return Inertia::render('dashboard', [
+        return Inertia::render('reports/index', [
             ...app(DashboardData::class)->build(),
         ]);
     }

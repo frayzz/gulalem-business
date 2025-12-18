@@ -7,15 +7,16 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\Payment;
 use App\Models\Product;
+use App\Services\PaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class OrderController extends Controller
 {
-    public function __construct(private InventoryService $inventory)
+    public function __construct(private InventoryService $inventory, private PaymentService $paymentService)
     {
     }
 
@@ -36,7 +37,7 @@ class OrderController extends Controller
     {
         $data = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
-            'status' => 'nullable|string',
+            'status' => ['nullable', Rule::in(Order::STATUSES)],
             'delivery_type' => 'required|string',
             'delivery_address' => 'nullable|string',
             'delivery_time' => 'nullable|date',
@@ -55,12 +56,12 @@ class OrderController extends Controller
         $order = DB::transaction(function () use ($data) {
             $order = Order::create([
                 'customer_id' => $data['customer_id'] ?? null,
-                'status' => $data['status'] ?? Order::STATUS_NEW,
+                'status' => $data['status'] ?? Order::STATUS_DRAFT,
                 'delivery_type' => $data['delivery_type'],
                 'delivery_address' => $data['delivery_address'] ?? null,
                 'delivery_time' => $data['delivery_time'] ?? null,
                 'discount' => $data['discount'] ?? 0,
-                'payment_status' => 'pending',
+                'payment_status' => PaymentService::STATUS_UNPAID,
             ]);
 
             $total = 0;
@@ -82,8 +83,12 @@ class OrderController extends Controller
                 'paid_total' => 0,
             ]);
 
+            $this->handleInventoryState($order, null, $order->status);
+
             if (!empty($data['payments'])) {
                 $this->recordPayments($order, $data['payments']);
+            } else {
+                $this->paymentService->refreshStatus($order);
             }
 
             return $order->load(['items.product', 'payments']);
@@ -100,14 +105,14 @@ class OrderController extends Controller
     public function updateStatus(Request $request, Order $order)
     {
         $data = $request->validate([
-            'status' => 'required|string',
+            'status' => ['required', Rule::in(Order::STATUSES)],
         ]);
 
-        $order->update(['status' => $data['status']]);
-
-        if ($data['status'] === Order::STATUS_COMPLETED) {
-            $this->inventory->consumeForOrder($order);
-        }
+        DB::transaction(function () use ($order, $data) {
+            $oldStatus = $order->status;
+            $order->update(['status' => $data['status']]);
+            $this->handleInventoryState($order, $oldStatus, $data['status']);
+        });
 
         $order->refresh()->load(['items.product', 'payments']);
 
@@ -133,28 +138,40 @@ class OrderController extends Controller
 
     protected function recordPayments(Order $order, array $payments): void
     {
-        $paidTotal = $order->paid_total;
-
         foreach ($payments as $payment) {
-            Payment::create([
+            $this->paymentService->registerPayment([
                 'order_id' => $order->id,
                 'method' => $payment['method'],
                 'amount' => $payment['amount'],
             ]);
-            $paidTotal += $payment['amount'];
+        }
+    }
+
+    protected function handleInventoryState(Order $order, ?string $oldStatus, string $newStatus): void
+    {
+        if ($oldStatus === null && $newStatus !== Order::STATUS_CANCELED) {
+            $this->inventory->reserveForOrder($order);
+            return;
         }
 
-        $paymentStatus = 'pending';
-
-        if ($paidTotal >= $order->total) {
-            $paymentStatus = 'paid';
-        } elseif ($paidTotal > 0) {
-            $paymentStatus = 'partial';
+        if ($newStatus === Order::STATUS_CANCELED && $oldStatus !== Order::STATUS_CANCELED) {
+            $this->inventory->releaseReservation($order);
+            return;
         }
 
-        $order->update([
-            'paid_total' => $paidTotal,
-            'payment_status' => $paymentStatus,
-        ]);
+        if ($newStatus === Order::STATUS_CONFIRMED && $oldStatus !== Order::STATUS_CONFIRMED) {
+            $this->inventory->reserveForOrder($order);
+            return;
+        }
+
+        $consumableStatuses = [
+            Order::STATUS_IN_ASSEMBLY,
+            Order::STATUS_READY,
+            Order::STATUS_DELIVERED,
+        ];
+
+        if (in_array($newStatus, $consumableStatuses, true) && !in_array($oldStatus, $consumableStatuses, true)) {
+            $this->inventory->consumeForOrder($order);
+        }
     }
 }

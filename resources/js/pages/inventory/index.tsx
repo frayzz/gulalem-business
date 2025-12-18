@@ -7,7 +7,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
-import { Leaf } from 'lucide-react';
+import { Leaf, Plus, Scissors } from 'lucide-react';
 import { FormEvent } from 'react';
 
 interface InventoryPageProps extends PageProps {
@@ -45,7 +45,7 @@ function formatDate(value?: string | null) {
     return new Date(value).toLocaleDateString('ru-RU');
 }
 
-export default function InventoryIndex({ batches, auth }: InventoryPageProps) {
+export default function InventoryIndex({ batches, recipes, auth }: InventoryPageProps) {
     const batchForm = useForm({
         product_name: '',
         quantity: '',
@@ -53,11 +53,34 @@ export default function InventoryIndex({ batches, auth }: InventoryPageProps) {
         expires_at: '',
     });
 
+    const recipeForm = useForm({
+        bouquet_name: '',
+        items: [{ name: '', qty: '' }],
+    });
+
     const submitBatch = (event: FormEvent) => {
         event.preventDefault();
         batchForm.post('/inventory', {
             onSuccess: () => batchForm.reset(),
         });
+    };
+
+    const submitRecipe = (event: FormEvent) => {
+        event.preventDefault();
+        recipeForm.post('/inventory/recipes', {
+            preserveScroll: true,
+            onSuccess: () => recipeForm.setData({ bouquet_name: '', items: [{ name: '', qty: '' }] }),
+        });
+    };
+
+    const addIngredient = () => {
+        recipeForm.setData('items', [...recipeForm.data.items, { name: '', qty: '' }]);
+    };
+
+    const updateIngredient = (index: number, field: 'name' | 'qty', value: string) => {
+        const next = [...recipeForm.data.items];
+        next[index] = { ...next[index], [field]: value };
+        recipeForm.setData('items', next);
     };
 
     return (
@@ -143,6 +166,90 @@ export default function InventoryIndex({ batches, auth }: InventoryPageProps) {
                     </CardContent>
                 </Card>
 
+                <Card className="border-border/80">
+                    <CardHeader>
+                        <CardTitle>Рецепт букета</CardTitle>
+                        <CardDescription>Опишите состав — он будет использоваться при сборке</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form className="space-y-4" onSubmit={submitRecipe}>
+                            <div className="space-y-2">
+                                <Label htmlFor="bouquet_name">Название букета</Label>
+                                <Input
+                                    id="bouquet_name"
+                                    value={recipeForm.data.bouquet_name}
+                                    onChange={(event) => recipeForm.setData('bouquet_name', event.target.value)}
+                                    placeholder="Например, Роза 15 шт"
+                                    required
+                                />
+                                {recipeForm.errors.bouquet_name && (
+                                    <p className="text-xs text-destructive">{recipeForm.errors.bouquet_name}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label>Компоненты</Label>
+                                    <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                                        onClick={addIngredient}
+                                    >
+                                        <Plus className="h-4 w-4" /> Добавить
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {recipeForm.data.items.map((item, index) => (
+                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
+                                            <div className="md:col-span-2 space-y-2">
+                                                <Label>Товар / материал</Label>
+                                                <Input
+                                                    value={item.name}
+                                                    onChange={(event) => updateIngredient(index, 'name', event.target.value)}
+                                                    placeholder="Роза Freedom"
+                                                    required
+                                                />
+                                                {recipeForm.errors[`items.${index}.name`] && (
+                                                    <p className="text-xs text-destructive">
+                                                        {recipeForm.errors[`items.${index}.name`]}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Количество</Label>
+                                                <Input
+                                                    type="number"
+                                                    min={0.001}
+                                                    step="0.001"
+                                                    value={item.qty}
+                                                    onChange={(event) => updateIngredient(index, 'qty', event.target.value)}
+                                                    required
+                                                />
+                                                {recipeForm.errors[`items.${index}.qty`] && (
+                                                    <p className="text-xs text-destructive">
+                                                        {recipeForm.errors[`items.${index}.qty`]}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end">
+                                <button
+                                    type="submit"
+                                    className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                                    disabled={recipeForm.processing}
+                                >
+                                    <Scissors className="mr-2 h-4 w-4" /> Сохранить рецепт
+                                </button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+
                 <Card>
                     <CardHeader>
                         <CardTitle>Партии товаров</CardTitle>
@@ -190,6 +297,41 @@ export default function InventoryIndex({ batches, auth }: InventoryPageProps) {
                                     </Link>
                                 ))}
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Рецепты букетов</CardTitle>
+                        <CardDescription>Список составов, используемых в заказах</CardDescription>
+                    </CardHeader>
+                    <CardContent className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>ID</TableHead>
+                                    <TableHead>Букет</TableHead>
+                                    <TableHead>Компоненты</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {recipes.map((recipe) => (
+                                    <TableRow key={recipe.id}>
+                                        <TableCell>#{recipe.id}</TableCell>
+                                        <TableCell className="font-medium">{recipe.bouquet?.name ?? 'Без названия'}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-wrap gap-2 text-sm">
+                                                {recipe.items.map((item) => (
+                                                    <Badge key={item.id} variant="secondary">
+                                                        {item.product?.name ?? 'Неизвестно'} × {Number(item.qty)}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                     </CardContent>
                 </Card>
             </div>

@@ -8,7 +8,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
 import { Clock, Plus, Trash2, Truck } from 'lucide-react';
-import { FormEvent } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 
 interface OrdersPageProps extends PageProps {
     orders: {
@@ -27,6 +27,13 @@ interface OrderResource {
     delivery_type: string;
     created_at: string;
     delivery_time?: string | null;
+}
+
+interface CustomerLookup {
+    id: number;
+    name: string | null;
+    phone: string | null;
+    orders: { id: number; total: string; status: string; created_at: string }[];
 }
 
 interface ProductResource {
@@ -86,6 +93,13 @@ function formatCurrency(value: string) {
     }).format(Number(value));
 }
 
+function formatDate(value: string) {
+    return new Intl.DateTimeFormat('ru-RU', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    }).format(new Date(value));
+}
+
 export default function OrdersIndex({ orders, products, auth }: OrdersPageProps) {
     const orderForm = useForm({
         customer_name: '',
@@ -94,6 +108,10 @@ export default function OrdersIndex({ orders, products, auth }: OrdersPageProps)
         notes: '',
         items: [{ product_id: '', qty: '1', price: '' }],
     });
+
+    const [customerLookup, setCustomerLookup] = useState<CustomerLookup | null>(null);
+    const [customerLookupError, setCustomerLookupError] = useState<string | null>(null);
+    const [isCustomerLookupLoading, setIsCustomerLookupLoading] = useState(false);
 
     const submitOrder = (event: FormEvent) => {
         event.preventDefault();
@@ -141,6 +159,49 @@ export default function OrdersIndex({ orders, products, auth }: OrdersPageProps)
         );
     };
 
+    useEffect(() => {
+        if (!orderForm.data.customer_phone) {
+            return () => {};
+        }
+
+        const controller = new AbortController();
+        const handle = setTimeout(() => {
+            setIsCustomerLookupLoading(true);
+            fetch(`/api/customers/lookup?phone=${encodeURIComponent(orderForm.data.customer_phone)}`, {
+                signal: controller.signal,
+                headers: {
+                    Accept: 'application/json',
+                },
+            })
+                .then(async (response) => {
+                    if (!response.ok) {
+                        setCustomerLookup(null);
+                        setCustomerLookupError((await response.json()).message ?? 'Не удалось найти клиента');
+                        return;
+                    }
+
+                    const data: CustomerLookup = await response.json();
+                    setCustomerLookup(data);
+                    setCustomerLookupError(null);
+
+                    if (!orderForm.data.customer_name && data.name) {
+                        orderForm.setData('customer_name', data.name);
+                    }
+                })
+                .catch((error) => {
+                    if (error.name === 'AbortError') return;
+                    setCustomerLookup(null);
+                    setCustomerLookupError('Не удалось найти клиента');
+                })
+                .finally(() => setIsCustomerLookupLoading(false));
+        }, 300);
+
+        return () => {
+            clearTimeout(handle);
+            controller.abort();
+        };
+    }, [orderForm]);
+
     return (
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="Заказы" />
@@ -177,13 +238,82 @@ export default function OrdersIndex({ orders, products, auth }: OrdersPageProps)
                                 <Input
                                     id="customer_phone"
                                     value={orderForm.data.customer_phone}
-                                    onChange={(event) => orderForm.setData('customer_phone', event.target.value)}
+                                    onChange={(event) => {
+                                        const nextPhone = event.target.value;
+                                        orderForm.setData('customer_phone', nextPhone);
+
+                                        if (!nextPhone) {
+                                            setCustomerLookup(null);
+                                            setCustomerLookupError(null);
+                                            setIsCustomerLookupLoading(false);
+                                        }
+                                    }}
                                     placeholder="+7 (999) 000-00-00"
                                 />
                                 {orderForm.errors.customer_phone && (
                                     <p className="text-xs text-destructive">{orderForm.errors.customer_phone}</p>
                                 )}
                             </div>
+                            {orderForm.data.customer_phone && (
+                                <div className="md:col-span-2 space-y-2 rounded-lg border border-border/70 bg-muted/30 p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium">Клиент</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                По номеру телефона подставим существующую карточку
+                                            </p>
+                                        </div>
+                                        {isCustomerLookupLoading && (
+                                            <Badge variant="secondary" className="text-[11px]">
+                                                Поиск...
+                                            </Badge>
+                                        )}
+                                    </div>
+
+                                    {customerLookup && (
+                                        <div className="space-y-3 text-sm">
+                                            <div className="grid gap-1 md:grid-cols-3">
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Имя</p>
+                                                    <p className="font-medium">{customerLookup.name ?? 'Без имени'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Телефон</p>
+                                                    <p className="font-medium">{customerLookup.phone ?? '—'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Заказы</p>
+                                                    <p className="font-medium">{customerLookup.orders.length}</p>
+                                                </div>
+                                            </div>
+
+                                            {!!customerLookup.orders.length && (
+                                                <div className="space-y-2">
+                                                    <p className="text-xs text-muted-foreground">Последние заказы</p>
+                                                    <div className="space-y-2">
+                                                        {customerLookup.orders.map((order) => (
+                                                            <div key={order.id} className="flex items-center justify-between rounded-md bg-background px-3 py-2 shadow-sm">
+                                                                <div className="space-y-0.5">
+                                                                    <p className="text-sm font-medium">Заказ #{order.id}</p>
+                                                                    <p className="text-xs text-muted-foreground">{formatDate(order.created_at)}</p>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="text-sm font-semibold">{formatCurrency(order.total)}</p>
+                                                                    <p className="text-xs text-muted-foreground">{statusLabels[order.status]}</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {customerLookupError && (
+                                        <p className="text-xs text-destructive">{customerLookupError}</p>
+                                    )}
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 <Label htmlFor="delivery_type">Тип доставки</Label>
                                 <select

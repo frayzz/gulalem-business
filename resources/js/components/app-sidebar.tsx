@@ -43,12 +43,12 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Касса',
-        href: `${dashboard()}#cash-desk`,
+        href: '/cash-desk',
         icon: Receipt,
     },
     {
         title: 'Клиенты',
-        href: `${dashboard()}#customers`,
+        href: '/customers',
         icon: Users,
     },
     {

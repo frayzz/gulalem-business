@@ -1,17 +1,21 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
 import { Clock, Truck } from 'lucide-react';
+import { FormEvent } from 'react';
 
 interface OrdersPageProps extends PageProps {
     orders: {
         data: OrderResource[];
         links: { url: string | null; label: string; active: boolean }[];
     };
+    bouquets: BouquetResource[];
 }
 
 interface OrderResource {
@@ -25,6 +29,14 @@ interface OrderResource {
     delivery_time?: string | null;
 }
 
+interface BouquetResource {
+    id: number;
+    name: string;
+    bouquet_recipe?: {
+        items: { id: number; qty: string; product?: { name: string } | null }[];
+    } | null;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Заказы',
@@ -34,10 +46,11 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusLabels: Record<string, string> = {
     new: 'Новый',
-    processing: 'В работе',
+    in_progress: 'В работе',
     ready: 'Готов',
     delivered: 'Доставлен',
     completed: 'Завершён',
+    cancelled: 'Отменён',
 };
 
 const deliveryLabels: Record<string, string> = {
@@ -54,7 +67,37 @@ function formatCurrency(value: string) {
     }).format(Number(value));
 }
 
-export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
+export default function OrdersIndex({ orders, bouquets, auth }: OrdersPageProps) {
+    const orderForm = useForm({
+        customer_name: '',
+        customer_phone: '',
+        delivery_type: 'pickup',
+        total: '',
+        notes: '',
+        bouquet_product_id: '',
+        quantity: '',
+    });
+
+    const submitOrder = (event: FormEvent) => {
+        event.preventDefault();
+        orderForm.post('/orders', {
+            onSuccess: () => orderForm.reset(),
+        });
+    };
+
+    const moveStatus = (orderId: number, status: string) => {
+        router.patch(`/orders/${orderId}/status`, { status });
+    };
+
+    const statusSteps: Record<string, string[]> = {
+        new: ['in_progress', 'cancelled'],
+        in_progress: ['ready', 'cancelled'],
+        ready: ['delivered', 'cancelled'],
+        delivered: ['completed'],
+        completed: [],
+        cancelled: [],
+    };
+
     return (
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="Заказы" />
@@ -66,6 +109,131 @@ export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
                         Последние заказы и их статус оплаты
                     </p>
                 </div>
+
+                <Card className="border-border/80">
+                    <CardHeader>
+                        <CardTitle>Быстрый заказ</CardTitle>
+                        <CardDescription>Создайте карточку клиента и сумму без лишних шагов</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form className="grid gap-4 md:grid-cols-2" onSubmit={submitOrder}>
+                            <div className="space-y-2">
+                                <Label htmlFor="customer_name">Имя клиента</Label>
+                                <Input
+                                    id="customer_name"
+                                    value={orderForm.data.customer_name}
+                                    onChange={(event) => orderForm.setData('customer_name', event.target.value)}
+                                    placeholder="Без имени"
+                                />
+                                {orderForm.errors.customer_name && (
+                                    <p className="text-xs text-destructive">{orderForm.errors.customer_name}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="customer_phone">Телефон</Label>
+                                <Input
+                                    id="customer_phone"
+                                    value={orderForm.data.customer_phone}
+                                    onChange={(event) => orderForm.setData('customer_phone', event.target.value)}
+                                    placeholder="+7 (999) 000-00-00"
+                                />
+                                {orderForm.errors.customer_phone && (
+                                    <p className="text-xs text-destructive">{orderForm.errors.customer_phone}</p>
+                                )}
+                            </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="delivery_type">Тип доставки</Label>
+                            <select
+                                id="delivery_type"
+                                className="w-full rounded-md border px-3 py-2 text-sm"
+                                    value={orderForm.data.delivery_type}
+                                    onChange={(event) => orderForm.setData('delivery_type', event.target.value)}
+                                >
+                                    <option value="pickup">Самовывоз</option>
+                                    <option value="courier">Доставка</option>
+                                    <option value="shipping">Отправка</option>
+                                </select>
+                                {orderForm.errors.delivery_type && (
+                                    <p className="text-xs text-destructive">{orderForm.errors.delivery_type}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="bouquet_product_id">Букет (рецепт)</Label>
+                                <select
+                                    id="bouquet_product_id"
+                                    className="w-full rounded-md border px-3 py-2 text-sm"
+                                    value={orderForm.data.bouquet_product_id}
+                                    onChange={(event) => orderForm.setData('bouquet_product_id', event.target.value)}
+                                >
+                                    <option value="">Не выбран</option>
+                                    {bouquets.map((bouquet) => (
+                                        <option key={bouquet.id} value={bouquet.id}>
+                                            {bouquet.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {orderForm.errors.bouquet_product_id && (
+                                    <p className="text-xs text-destructive">{orderForm.errors.bouquet_product_id}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="quantity">Количество букетов</Label>
+                                <Input
+                                    id="quantity"
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    value={orderForm.data.quantity}
+                                    onChange={(event) => orderForm.setData('quantity', event.target.value)}
+                                    placeholder="1"
+                                />
+                                {orderForm.errors.quantity && (
+                                    <p className="text-xs text-destructive">{orderForm.errors.quantity}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                    Рецепт спишется со склада после полной оплаты заказа.
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="total">Сумма</Label>
+                                <Input
+                                    id="total"
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={orderForm.data.total}
+                                    onChange={(event) => orderForm.setData('total', event.target.value)}
+                                    required
+                                />
+                                {orderForm.errors.total && (
+                                    <p className="text-xs text-destructive">{orderForm.errors.total}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                                <Label htmlFor="notes">Комментарий</Label>
+                                <textarea
+                                    id="notes"
+                                    className="min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"
+                                    value={orderForm.data.notes}
+                                    onChange={(event) => orderForm.setData('notes', event.target.value)}
+                                    placeholder="Описание состава, пожелания, детали доставки"
+                                />
+                                {orderForm.errors.notes && (
+                                    <p className="text-xs text-destructive">{orderForm.errors.notes}</p>
+                                )}
+                            </div>
+                            <div className="md:col-span-2">
+                                <button
+                                    type="submit"
+                                    className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                                    disabled={orderForm.processing}
+                                >
+                                    Добавить заказ
+                                </button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
 
                 <Card>
                     <CardHeader>
@@ -85,6 +253,7 @@ export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
                                     <TableHead>Сумма</TableHead>
                                     <TableHead>Оплата</TableHead>
                                     <TableHead>Статус</TableHead>
+                                    <TableHead>Действия</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -110,6 +279,17 @@ export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
                                             <Badge variant="outline">
                                                 {statusLabels[order.status] ?? order.status}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell className="space-x-2">
+                                            {statusSteps[order.status]?.map((status) => (
+                                                <button
+                                                    key={`${order.id}-${status}`}
+                                                    onClick={() => moveStatus(order.id, status)}
+                                                    className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                                                >
+                                                    {statusLabels[status] ?? status}
+                                                </button>
+                                            ))}
                                         </TableCell>
                                     </TableRow>
                                 ))}

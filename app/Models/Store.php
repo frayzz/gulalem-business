@@ -9,6 +9,8 @@ class Store extends Model
 {
     use HasFactory;
 
+    protected $table = 'shops';
+
     protected $fillable = [
         'name',
         'city',
@@ -20,6 +22,6 @@ class Store extends Model
      */
     public function users()
     {
-        return $this->belongsToMany(User::class)->withTimestamps();
+        return $this->belongsToMany(User::class, 'shop_user', 'shop_id', 'user_id')->withTimestamps();
     }
 }

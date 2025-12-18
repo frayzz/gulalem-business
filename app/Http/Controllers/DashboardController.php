@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\ProductBatch;
@@ -55,12 +56,45 @@ class DashboardController extends Controller
             ->where('status', Order::STATUS_COMPLETED)
             ->count();
 
+        $crmSummary = [
+            'activeOrders' => Order::whereNotIn('status', [
+                Order::STATUS_COMPLETED,
+                Order::STATUS_CANCELLED,
+            ])->count(),
+            'upcomingDeliveries' => Order::whereNotNull('delivery_time')
+                ->where('delivery_time', '>=', $today->startOfDay())
+                ->count(),
+            'unpaidTotal' => (float) Order::where('payment_status', '!=', 'paid')
+                ->get()
+                ->sum(fn (Order $order) => max((float) $order->total - (float) $order->paid_total, 0)),
+            'newCustomers' => Customer::where('created_at', '>=', Carbon::now()->subDays(7))->count(),
+            'totalCustomers' => Customer::count(),
+        ];
+
+        $pipeline = Order::selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->get()
+            ->map(fn (Order $order) => [
+                'status' => $order->status,
+                'total' => (int) $order->total,
+            ]);
+
+        $inventoryAlerts = [
+            'expiringSoon' => ProductBatch::whereNotNull('expires_at')
+                ->whereBetween('expires_at', [$today, (clone $today)->addDays(3)])
+                ->count(),
+            'lowStock' => ProductBatch::where('qty_left', '<', 5)->count(),
+        ];
+
         return Inertia::render('dashboard', [
             'orders' => $orders,
             'inventory' => $inventory,
             'paymentsToday' => (float) $paymentsToday,
             'ordersToday' => $ordersToday,
             'completedToday' => $completedToday,
+            'crmSummary' => $crmSummary,
+            'pipeline' => $pipeline,
+            'inventoryAlerts' => $inventoryAlerts,
         ]);
     }
 }

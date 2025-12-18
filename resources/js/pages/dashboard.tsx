@@ -6,7 +6,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
-import { Banknote, ClipboardList, Leaf, PackageSearch } from 'lucide-react';
+import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, ClipboardList, Leaf, PackageSearch, Users } from 'lucide-react';
 
 interface DashboardProps extends PageProps {
     orders: OrderResource[];
@@ -14,6 +14,9 @@ interface DashboardProps extends PageProps {
     paymentsToday: number;
     ordersToday: number;
     completedToday: number;
+    crmSummary: CrmSummary;
+    pipeline: PipelineItem[];
+    inventoryAlerts: InventoryAlerts;
 }
 
 interface OrderResource {
@@ -37,16 +40,36 @@ interface InventoryResource {
     arrived_at?: string | null;
 }
 
+interface CrmSummary {
+    activeOrders: number;
+    upcomingDeliveries: number;
+    unpaidTotal: number;
+    newCustomers: number;
+    totalCustomers: number;
+}
+
+interface PipelineItem {
+    status: string;
+    total: number;
+}
+
+interface InventoryAlerts {
+    expiringSoon: number;
+    lowStock: number;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
 ];
 
 const statusLabels: Record<string, string> = {
     new: 'Новый',
+    in_progress: 'В работе',
     processing: 'В работе',
     ready: 'Готов',
     delivered: 'Доставлен',
     completed: 'Завершён',
+    cancelled: 'Отменён',
 };
 
 const deliveryLabels: Record<string, string> = {
@@ -63,7 +86,21 @@ function formatCurrency(value: number) {
     }).format(value);
 }
 
-export default function Dashboard({ auth, orders, inventory, paymentsToday, ordersToday, completedToday }: DashboardProps) {
+function formatNumber(value: number) {
+    return new Intl.NumberFormat('ru-RU').format(value);
+}
+
+export default function Dashboard({
+    auth,
+    orders,
+    inventory,
+    paymentsToday,
+    ordersToday,
+    completedToday,
+    crmSummary,
+    pipeline,
+    inventoryAlerts,
+}: DashboardProps) {
     const summaryCards = [
         {
             title: 'Выручка сегодня',
@@ -83,6 +120,17 @@ export default function Dashboard({ auth, orders, inventory, paymentsToday, orde
             description: 'Отсортированы по сроку годности',
             icon: PackageSearch,
         },
+    ];
+
+    const pipelineTotals = pipeline.reduce<Record<string, number>>((acc, item) => {
+        acc[item.status] = item.total;
+        return acc;
+    }, {});
+
+    const basePipelineStatuses = ['new', 'in_progress', 'ready', 'delivered', 'completed', 'cancelled'];
+    const pipelineStatuses = [
+        ...basePipelineStatuses,
+        ...pipeline.map((item) => item.status).filter((status) => !basePipelineStatuses.includes(status)),
     ];
 
     return (
@@ -121,6 +169,119 @@ export default function Dashboard({ auth, orders, inventory, paymentsToday, orde
                         </Card>
                     ))}
                 </section>
+
+                <section className="grid gap-4 lg:grid-cols-3" id="crm">
+                    <Card className="border-border/80">
+                        <CardHeader>
+                            <CardTitle>CRM и операции</CardTitle>
+                            <CardDescription>Срез по воронке и оплатам без фильтров</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                            <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+                                <ClipboardList className="mt-1 h-4 w-4 text-primary" />
+                                <div>
+                                    <p className="font-medium">Активные заказы</p>
+                                    <p className="text-muted-foreground">
+                                        {formatNumber(crmSummary.activeOrders)} в работе, пока не закрыты как «Завершён»
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+                                <Banknote className="mt-1 h-4 w-4 text-primary" />
+                                <div>
+                                    <p className="font-medium">Долг по оплате</p>
+                                    <p className="text-muted-foreground">
+                                        {crmSummary.unpaidTotal === 0
+                                            ? 'Все заказы закрыты по оплате'
+                                            : `${formatCurrency(crmSummary.unpaidTotal)} нужно оплатить`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+                                <CalendarClock className="mt-1 h-4 w-4 text-primary" />
+                                <div>
+                                    <p className="font-medium">Ближайшие доставки</p>
+                                    <p className="text-muted-foreground">
+                                        {formatNumber(crmSummary.upcomingDeliveries)} с назначенным временем
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-border/80">
+                        <CardHeader>
+                            <CardTitle>Клиентская база</CardTitle>
+                            <CardDescription>Обновляется автоматически из заказов</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                            <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+                                <Users className="mt-1 h-4 w-4 text-primary" />
+                                <div>
+                                    <p className="font-medium">Всего клиентов</p>
+                                    <p className="text-muted-foreground">{formatNumber(crmSummary.totalCustomers)} записей</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+                                <CheckCircle2 className="mt-1 h-4 w-4 text-primary" />
+                                <div>
+                                    <p className="font-medium">Новые за 7 дней</p>
+                                    <p className="text-muted-foreground">{formatNumber(crmSummary.newCustomers)} клиента(ов)</p>
+                                </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Роли пока не ограничивают просмотр дашборда — данные видны всем авторизованным пользователям.
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-border/80">
+                        <CardHeader>
+                            <CardTitle>Контроль склада</CardTitle>
+                            <CardDescription>Основано на партиях и сроках годности</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                            <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+                                <AlertTriangle className="mt-1 h-4 w-4 text-primary" />
+                                <div>
+                                    <p className="font-medium">Просрочка в ближайшие 3 дня</p>
+                                    <p className="text-muted-foreground">{formatNumber(inventoryAlerts.expiringSoon)} партий</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+                                <PackageSearch className="mt-1 h-4 w-4 text-primary" />
+                                <div>
+                                    <p className="font-medium">Малый остаток (&lt; 5 шт.)</p>
+                                    <p className="text-muted-foreground">{formatNumber(inventoryAlerts.lowStock)} позиций</p>
+                                </div>
+                            </div>
+                            <Button asChild variant="ghost" size="sm" className="mt-1">
+                                <Link href="/inventory">Открыть склад</Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </section>
+
+                <Card className="border-border/80" id="pipeline">
+                    <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <CardTitle>Воронка заказов</CardTitle>
+                            <CardDescription>Контроль статусов и скорости прохождения</CardDescription>
+                        </div>
+                        <Button asChild variant="outline" size="sm">
+                            <Link href="/orders">Управлять заказами</Link>
+                        </Button>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 md:grid-cols-3">
+                        {pipelineStatuses.map((status) => (
+                            <div key={status} className="rounded-lg border bg-muted/30 px-3 py-2">
+                                <p className="text-sm font-medium">{statusLabels[status] ?? status}</p>
+                                <p className="text-lg font-semibold">{formatNumber(pipelineTotals[status] ?? 0)}</p>
+                                <p className="text-xs text-muted-foreground">Всего заказов со статусом</p>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
 
                 <section className="grid gap-4 lg:grid-cols-2" id="orders">
                     <Card>
@@ -214,6 +375,44 @@ export default function Dashboard({ auth, orders, inventory, paymentsToday, orde
                         </CardContent>
                     </Card>
                 </section>
+
+                <Card className="border-border/80" id="how-to-fill">
+                    <CardHeader>
+                        <CardTitle>Как наполнить дашборд данными</CardTitle>
+                        <CardDescription>
+                            Добавьте реальные заказы, партии и комментарии — показатели обновятся мгновенно
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 md:grid-cols-3">
+                        <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                            <p className="font-medium">Создайте заказ</p>
+                            <p className="text-muted-foreground">
+                                Из карточки заказа попадут воронка, оплаты и заметки клиентов.
+                            </p>
+                            <Button asChild size="sm">
+                                <Link href="/orders">Перейти в заказы</Link>
+                            </Button>
+                        </div>
+                        <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                            <p className="font-medium">Заведите приход на склад</p>
+                            <p className="text-muted-foreground">
+                                Партии с датой поступления и сроком годности попадут в блок «Склад» и контроль просрочки.
+                            </p>
+                            <Button asChild size="sm" variant="secondary">
+                                <Link href="/inventory">Открыть склад</Link>
+                            </Button>
+                        </div>
+                        <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                            <p className="font-medium">Фиксируйте комментарии</p>
+                            <p className="text-muted-foreground">
+                                Любые примечания клиентов появятся в блоке «Комментарии из заказов».
+                            </p>
+                            <Button asChild size="sm" variant="outline">
+                                <Link href="/comments">Перейти в комментарии</Link>
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">

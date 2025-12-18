@@ -16,6 +16,7 @@ interface InventoryPageProps extends PageProps {
         links: { url: string | null; label: string; active: boolean }[];
     };
     recipes: RecipeResource[];
+    products: ProductResource[];
 }
 
 interface BatchResource {
@@ -36,6 +37,13 @@ interface RecipeResource {
     }[];
 }
 
+interface ProductResource {
+    id: number;
+    name: string;
+    unit: string;
+    available_qty: number;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Склад', href: '/inventory' },
 ];
@@ -45,7 +53,7 @@ function formatDate(value?: string | null) {
     return new Date(value).toLocaleDateString('ru-RU');
 }
 
-export default function InventoryIndex({ batches, recipes, auth }: InventoryPageProps) {
+export default function InventoryIndex({ batches, recipes, products, auth }: InventoryPageProps) {
     const batchForm = useForm({
         product_name: '',
         product_price: '',
@@ -58,7 +66,7 @@ export default function InventoryIndex({ batches, recipes, auth }: InventoryPage
     const recipeForm = useForm({
         bouquet_name: '',
         bouquet_price: '',
-        items: [{ name: '', qty: '' }],
+        items: [{ product_id: '', qty: '' }],
     });
 
     const submitBatch = (event: FormEvent) => {
@@ -72,15 +80,15 @@ export default function InventoryIndex({ batches, recipes, auth }: InventoryPage
         event.preventDefault();
         recipeForm.post('/inventory/recipes', {
             preserveScroll: true,
-            onSuccess: () => recipeForm.setData({ bouquet_name: '', bouquet_price: '', items: [{ name: '', qty: '' }] }),
+            onSuccess: () => recipeForm.setData({ bouquet_name: '', bouquet_price: '', items: [{ product_id: '', qty: '' }] }),
         });
     };
 
     const addIngredient = () => {
-        recipeForm.setData('items', [...recipeForm.data.items, { name: '', qty: '' }]);
+        recipeForm.setData('items', [...recipeForm.data.items, { product_id: '', qty: '' }]);
     };
 
-    const updateIngredient = (index: number, field: 'name' | 'qty', value: string) => {
+    const updateIngredient = (index: number, field: 'product_id' | 'qty', value: string) => {
         const next = [...recipeForm.data.items];
         next[index] = { ...next[index], [field]: value };
         recipeForm.setData('items', next);
@@ -235,11 +243,11 @@ export default function InventoryIndex({ batches, recipes, auth }: InventoryPage
                                 )}
                             </div>
 
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <Label>Компоненты</Label>
-                                    <button
-                                        type="button"
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <Label>Компоненты</Label>
+                                        <button
+                                            type="button"
                                         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                                         onClick={addIngredient}
                                     >
@@ -248,40 +256,73 @@ export default function InventoryIndex({ batches, recipes, auth }: InventoryPage
                                 </div>
 
                                 <div className="space-y-3">
-                                    {recipeForm.data.items.map((item, index) => (
-                                        <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
-                                            <div className="md:col-span-2 space-y-2">
-                                                <Label>Товар / материал</Label>
-                                                <Input
-                                                    value={item.name}
-                                                    onChange={(event) => updateIngredient(index, 'name', event.target.value)}
-                                                    placeholder="Роза Freedom"
-                                                    required
-                                                />
-                                                {recipeForm.errors[`items.${index}.name`] && (
-                                                    <p className="text-xs text-destructive">
-                                                        {recipeForm.errors[`items.${index}.name`]}
-                                                    </p>
-                                                )}
+                                    {recipeForm.errors.items && (
+                                        <p className="text-sm text-destructive">{recipeForm.errors.items}</p>
+                                    )}
+
+                                    {products.length === 0 && (
+                                        <p className="text-sm text-muted-foreground">
+                                            На складе нет товаров для добавления в рецепт.
+                                        </p>
+                                    )}
+
+                                    {recipeForm.data.items.map((item, index) => {
+                                        const selectedProduct = products.find(
+                                            (product) => product.id === Number(item.product_id)
+                                        );
+
+                                        return (
+                                            <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] md:items-end">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`recipe_product_${index}`}>Товар / материал</Label>
+                                                    <select
+                                                        id={`recipe_product_${index}`}
+                                                        className="w-full rounded-md border px-3 py-2 text-sm"
+                                                        value={item.product_id}
+                                                        onChange={(event) =>
+                                                            updateIngredient(index, 'product_id', event.target.value)
+                                                        }
+                                                        required
+                                                        disabled={!products.length}
+                                                    >
+                                                        <option value="">Выберите товар</option>
+                                                        {products.map((product) => (
+                                                            <option key={product.id} value={product.id}>
+                                                                {product.name} · {product.available_qty} {product.unit}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    {recipeForm.errors[`items.${index}.product_id`] && (
+                                                        <p className="text-xs text-destructive">
+                                                            {recipeForm.errors[`items.${index}.product_id`]}
+                                                        </p>
+                                                    )}
+                                                    {selectedProduct && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Доступно на складе: {selectedProduct.available_qty} {selectedProduct.unit}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`recipe_qty_${index}`}>Количество</Label>
+                                                    <Input
+                                                        id={`recipe_qty_${index}`}
+                                                        type="number"
+                                                        min={0.001}
+                                                        step="0.001"
+                                                        value={item.qty}
+                                                        onChange={(event) => updateIngredient(index, 'qty', event.target.value)}
+                                                        required
+                                                    />
+                                                    {recipeForm.errors[`items.${index}.qty`] && (
+                                                        <p className="text-xs text-destructive">
+                                                            {recipeForm.errors[`items.${index}.qty`]}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label>Количество</Label>
-                                                <Input
-                                                    type="number"
-                                                    min={0.001}
-                                                    step="0.001"
-                                                    value={item.qty}
-                                                    onChange={(event) => updateIngredient(index, 'qty', event.target.value)}
-                                                    required
-                                                />
-                                                {recipeForm.errors[`items.${index}.qty`] && (
-                                                    <p className="text-xs text-destructive">
-                                                        {recipeForm.errors[`items.${index}.qty`]}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 

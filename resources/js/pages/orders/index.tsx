@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
 import { Clock, Truck } from 'lucide-react';
 import { FormEvent } from 'react';
@@ -53,6 +53,15 @@ const statusLabels: Record<string, string> = {
     cancelled: 'Отменён',
 };
 
+const statusSteps: Record<string, string[]> = {
+    new: ['in_progress', 'cancelled'],
+    in_progress: ['ready', 'cancelled'],
+    ready: ['delivered', 'completed'],
+    delivered: ['completed'],
+    completed: [],
+    cancelled: [],
+};
+
 const deliveryLabels: Record<string, string> = {
     pickup: 'Самовывоз',
     courier: 'Доставка',
@@ -81,6 +90,17 @@ export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
         orderForm.post('/orders', {
             onSuccess: () => orderForm.reset(),
         });
+    };
+
+    const moveStatus = (orderId: number, status: string) => {
+        router.post(
+            `/api/orders/${orderId}/status`,
+            { status },
+            {
+                preserveScroll: true,
+                preserveState: true,
+            }
+        );
     };
 
     return (

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
@@ -14,11 +15,19 @@ class Stores
     }
 
     /**
-     * Get all available stores from configuration.
+     * Get all available stores for current user.
+     *
+     * @return Collection<int, Store>
      */
     public function all(): Collection
     {
-        return collect(config('stores', []));
+        $user = $this->request->user();
+
+        if ($user) {
+            return $user->accessibleStores();
+        }
+
+        return Store::query()->orderBy('name')->get();
     }
 
     /**
@@ -30,7 +39,7 @@ class Stores
 
         abort_if(! $store, 404);
 
-        $this->request->session()->put(self::SESSION_KEY, $store['id']);
+        $this->request->session()->put(self::SESSION_KEY, $store->id);
     }
 
     /**
@@ -56,14 +65,14 @@ class Stores
     /**
      * Get the current store data.
      */
-    public function current(): ?array
+    public function current(): ?Store
     {
         $storeId = $this->currentId();
 
         return $storeId ? $this->find($storeId) : null;
     }
 
-    private function find(?int $storeId): ?array
+    private function find(?int $storeId): ?Store
     {
         if (! $storeId) {
             return null;

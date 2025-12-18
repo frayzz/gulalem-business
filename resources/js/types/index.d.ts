@@ -34,6 +34,7 @@ export interface SharedData {
     quote: { message: string; author: string };
     auth: Auth;
     sidebarOpen: boolean;
+    abilities?: { manageStores: boolean };
     stores?: Store[];
     currentStoreId?: number | null;
     currentStore?: Store | null;

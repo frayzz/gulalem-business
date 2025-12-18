@@ -16,6 +16,15 @@ class Order extends Model
     public const STATUS_DELIVERED = 'delivered';
     public const STATUS_CANCELED = 'canceled';
 
+    public const STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_CONFIRMED,
+        self::STATUS_IN_ASSEMBLY,
+        self::STATUS_READY,
+        self::STATUS_DELIVERED,
+        self::STATUS_CANCELED,
+    ];
+
     protected $fillable = [
         'customer_id',
         'status',

@@ -11,6 +11,7 @@ use App\Models\ProductBatch;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Illuminate\Validation\ValidationException;
 
 class InventoryService
 {
@@ -119,15 +120,57 @@ class InventoryService
                     }
 
                     $this->consumeBouquet($product->bouquetRecipe->items, $item->qty, $order->id);
+
+                    foreach ($product->bouquetRecipe->items as $recipeItem) {
+                        InventoryReservation::where('order_id', $order->id)
+                            ->where('product_id', $recipeItem->product_id)
+                            ->delete();
+                    }
                 } else {
                     $this->writeOff($product, $item->qty, $order->id, 'order-fulfillment');
-                }
 
-                InventoryReservation::where('order_id', $order->id)
-                    ->where('product_id', $product->id)
-                    ->delete();
+                    InventoryReservation::where('order_id', $order->id)
+                        ->where('product_id', $product->id)
+                        ->delete();
+                }
             }
         });
+    }
+
+    public function assertAvailabilityForOrder(Order $order): void
+    {
+        $order->loadMissing('items.product.bouquetRecipe.items');
+
+        $requirements = [];
+
+        foreach ($order->items as $item) {
+            $product = $item->product;
+
+            if ($product->type === Product::TYPE_BOUQUET) {
+                if (!$product->bouquetRecipe) {
+                    throw new RuntimeException("Bouquet {$product->id} is missing a recipe");
+                }
+
+                foreach ($product->bouquetRecipe->items as $recipeItem) {
+                    $requirements[$recipeItem->product_id] = ($requirements[$recipeItem->product_id] ?? 0) + ($item->qty * $recipeItem->qty);
+                }
+
+                continue;
+            }
+
+            $requirements[$product->id] = ($requirements[$product->id] ?? 0) + $item->qty;
+        }
+
+        foreach ($requirements as $productId => $requiredQty) {
+            $product = Product::findOrFail($productId);
+            $available = $this->getAvailableQty($product, $order->id);
+
+            if ($available < $requiredQty) {
+                throw ValidationException::withMessages([
+                    'items' => "Недостаточно товара '{$product->name}'. Требуется {$requiredQty}, доступно {$available}.",
+                ]);
+            }
+        }
     }
 
     /**
@@ -148,20 +191,43 @@ class InventoryService
 
             foreach ($order->items as $item) {
                 $product = $item->product;
-                $requiredQty = $product->type === Product::TYPE_BOUQUET
-                    ? $this->calculateBouquetQty($product, $item->qty)
-                    : $item->qty;
+
+                if ($product->type === Product::TYPE_BOUQUET) {
+                    if (!$product->bouquetRecipe) {
+                        throw new RuntimeException("Bouquet {$product->id} is missing a recipe");
+                    }
+
+                    foreach ($product->bouquetRecipe->items as $recipeItem) {
+                        $requiredQty = $item->qty * $recipeItem->qty;
+
+                        InventoryReservation::updateOrCreate(
+                            ['order_id' => $order->id, 'product_id' => $recipeItem->product_id],
+                            ['qty' => $requiredQty]
+                        );
+
+                        InventoryMovement::create([
+                            'product_id' => $recipeItem->product_id,
+                            'batch_id' => null,
+                            'type' => InventoryMovement::TYPE_RESERVE,
+                            'qty' => $requiredQty,
+                            'reason' => 'order-reservation',
+                            'order_id' => $order->id,
+                        ]);
+                    }
+
+                    continue;
+                }
 
                 InventoryReservation::updateOrCreate(
                     ['order_id' => $order->id, 'product_id' => $product->id],
-                    ['qty' => $requiredQty]
+                    ['qty' => $item->qty]
                 );
 
                 InventoryMovement::create([
                     'product_id' => $product->id,
                     'batch_id' => null,
                     'type' => InventoryMovement::TYPE_RESERVE,
-                    'qty' => $requiredQty,
+                    'qty' => $item->qty,
                     'reason' => 'order-reservation',
                     'order_id' => $order->id,
                 ]);
@@ -202,5 +268,20 @@ class InventoryService
         }
 
         return $total;
+    }
+
+    protected function getAvailableQty(Product $product, ?int $orderId = null): float
+    {
+        $stock = ProductBatch::where('product_id', $product->id)->sum('qty_left');
+
+        $reservedQuery = InventoryReservation::where('product_id', $product->id);
+
+        if ($orderId !== null) {
+            $reservedQuery->where('order_id', '!=', $orderId);
+        }
+
+        $reserved = $reservedQuery->sum('qty');
+
+        return max(0, $stock - $reserved);
     }
 }

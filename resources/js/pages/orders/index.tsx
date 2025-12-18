@@ -15,6 +15,7 @@ interface OrdersPageProps extends PageProps {
         data: OrderResource[];
         links: { url: string | null; label: string; active: boolean }[];
     };
+    bouquets: BouquetResource[];
 }
 
 interface OrderResource {
@@ -28,6 +29,14 @@ interface OrderResource {
     delivery_time?: string | null;
 }
 
+interface BouquetResource {
+    id: number;
+    name: string;
+    bouquet_recipe?: {
+        items: { id: number; qty: string; product?: { name: string } | null }[];
+    } | null;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Заказы',
@@ -37,10 +46,11 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusLabels: Record<string, string> = {
     new: 'Новый',
-    processing: 'В работе',
+    in_progress: 'В работе',
     ready: 'Готов',
     delivered: 'Доставлен',
     completed: 'Завершён',
+    cancelled: 'Отменён',
 };
 
 const deliveryLabels: Record<string, string> = {
@@ -191,6 +201,7 @@ export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
                                     <TableHead>Сумма</TableHead>
                                     <TableHead>Оплата</TableHead>
                                     <TableHead>Статус</TableHead>
+                                    <TableHead>Действия</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -216,6 +227,17 @@ export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
                                             <Badge variant="outline">
                                                 {statusLabels[order.status] ?? order.status}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell className="space-x-2">
+                                            {statusSteps[order.status]?.map((status) => (
+                                                <button
+                                                    key={`${order.id}-${status}`}
+                                                    onClick={() => moveStatus(order.id, status)}
+                                                    className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                                                >
+                                                    {statusLabels[status] ?? status}
+                                                </button>
+                                            ))}
                                         </TableCell>
                                     </TableRow>
                                 ))}

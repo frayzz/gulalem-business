@@ -15,6 +15,7 @@ interface InventoryPageProps extends PageProps {
         data: BatchResource[];
         links: { url: string | null; label: string; active: boolean }[];
     };
+    recipes: RecipeResource[];
 }
 
 interface BatchResource {
@@ -23,6 +24,16 @@ interface BatchResource {
     qty_left: string;
     expires_at?: string | null;
     arrived_at?: string | null;
+}
+
+interface RecipeResource {
+    id: number;
+    bouquet?: { name: string } | null;
+    items: {
+        id: number;
+        qty: string;
+        product?: { name: string } | null;
+    }[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [

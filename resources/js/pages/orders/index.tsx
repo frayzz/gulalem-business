@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
 import { Clock, Truck } from 'lucide-react';
 import { FormEvent } from 'react';
@@ -67,15 +67,13 @@ function formatCurrency(value: string) {
     }).format(Number(value));
 }
 
-export default function OrdersIndex({ orders, bouquets, auth }: OrdersPageProps) {
+export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
     const orderForm = useForm({
         customer_name: '',
         customer_phone: '',
         delivery_type: 'pickup',
         total: '',
         notes: '',
-        bouquet_product_id: '',
-        quantity: '',
     });
 
     const submitOrder = (event: FormEvent) => {
@@ -83,19 +81,6 @@ export default function OrdersIndex({ orders, bouquets, auth }: OrdersPageProps)
         orderForm.post('/orders', {
             onSuccess: () => orderForm.reset(),
         });
-    };
-
-    const moveStatus = (orderId: number, status: string) => {
-        router.patch(`/orders/${orderId}/status`, { status });
-    };
-
-    const statusSteps: Record<string, string[]> = {
-        new: ['in_progress', 'cancelled'],
-        in_progress: ['ready', 'cancelled'],
-        ready: ['delivered', 'cancelled'],
-        delivered: ['completed'],
-        completed: [],
-        cancelled: [],
     };
 
     return (
@@ -141,11 +126,11 @@ export default function OrdersIndex({ orders, bouquets, auth }: OrdersPageProps)
                                     <p className="text-xs text-destructive">{orderForm.errors.customer_phone}</p>
                                 )}
                             </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="delivery_type">Тип доставки</Label>
-                            <select
-                                id="delivery_type"
-                                className="w-full rounded-md border px-3 py-2 text-sm"
+                            <div className="space-y-2">
+                                <Label htmlFor="delivery_type">Тип доставки</Label>
+                                <select
+                                    id="delivery_type"
+                                    className="w-full rounded-md border px-3 py-2 text-sm"
                                     value={orderForm.data.delivery_type}
                                     onChange={(event) => orderForm.setData('delivery_type', event.target.value)}
                                 >
@@ -156,43 +141,6 @@ export default function OrdersIndex({ orders, bouquets, auth }: OrdersPageProps)
                                 {orderForm.errors.delivery_type && (
                                     <p className="text-xs text-destructive">{orderForm.errors.delivery_type}</p>
                                 )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="bouquet_product_id">Букет (рецепт)</Label>
-                                <select
-                                    id="bouquet_product_id"
-                                    className="w-full rounded-md border px-3 py-2 text-sm"
-                                    value={orderForm.data.bouquet_product_id}
-                                    onChange={(event) => orderForm.setData('bouquet_product_id', event.target.value)}
-                                >
-                                    <option value="">Не выбран</option>
-                                    {bouquets.map((bouquet) => (
-                                        <option key={bouquet.id} value={bouquet.id}>
-                                            {bouquet.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                {orderForm.errors.bouquet_product_id && (
-                                    <p className="text-xs text-destructive">{orderForm.errors.bouquet_product_id}</p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="quantity">Количество букетов</Label>
-                                <Input
-                                    id="quantity"
-                                    type="number"
-                                    min={1}
-                                    step={1}
-                                    value={orderForm.data.quantity}
-                                    onChange={(event) => orderForm.setData('quantity', event.target.value)}
-                                    placeholder="1"
-                                />
-                                {orderForm.errors.quantity && (
-                                    <p className="text-xs text-destructive">{orderForm.errors.quantity}</p>
-                                )}
-                                <p className="text-xs text-muted-foreground">
-                                    Рецепт спишется со склада после полной оплаты заказа.
-                                </p>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="total">Сумма</Label>

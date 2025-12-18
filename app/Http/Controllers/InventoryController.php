@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BouquetRecipe;
-use App\Models\BouquetRecipeItem;
 use App\Models\Product;
 use App\Models\ProductBatch;
 use Illuminate\Http\RedirectResponse;
@@ -17,7 +15,6 @@ class InventoryController extends Controller
     {
         return Inertia::render('inventory/index', [
             'batches' => ProductBatch::with('product')->latest('arrived_at')->paginate(15),
-            'recipes' => BouquetRecipe::with(['bouquet', 'items.product'])->latest()->get(),
         ]);
     }
 
@@ -52,48 +49,5 @@ class InventoryController extends Controller
         ]);
 
         return back()->with('success', 'Партия добавлена на склад.');
-    }
-
-    public function storeRecipe(Request $request): RedirectResponse
-    {
-        $validated = $request->validate([
-            'bouquet_name' => ['required', 'string', 'max:255'],
-            'components' => ['required', 'array', 'min:1'],
-            'components.*.product_name' => ['required', 'string', 'max:255'],
-            'components.*.qty' => ['required', 'numeric', 'min:0.1'],
-        ]);
-
-        $bouquet = Product::firstOrCreate(
-            ['name' => $validated['bouquet_name'], 'type' => Product::TYPE_BOUQUET],
-            [
-                'unit' => 'шт',
-                'sku' => null,
-                'active' => true,
-                'default_price' => 0,
-            ],
-        );
-
-        $recipe = BouquetRecipe::firstOrCreate(['bouquet_product_id' => $bouquet->id]);
-        $recipe->items()->delete();
-
-        foreach ($validated['components'] as $component) {
-            $product = Product::firstOrCreate(
-                ['name' => $component['product_name'], 'type' => Product::TYPE_FLOWER],
-                [
-                    'unit' => 'шт',
-                    'sku' => null,
-                    'active' => true,
-                    'default_price' => 0,
-                ],
-            );
-
-            BouquetRecipeItem::create([
-                'recipe_id' => $recipe->id,
-                'product_id' => $product->id,
-                'qty' => $component['qty'],
-            ]);
-        }
-
-        return back()->with('success', 'Рецепт букета сохранён.');
     }
 }

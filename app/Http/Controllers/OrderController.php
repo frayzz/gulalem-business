@@ -4,8 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,10 +15,6 @@ class OrderController extends Controller
     {
         return Inertia::render('orders/index', [
             'orders' => Order::with(['customer', 'payments'])->latest()->paginate(15),
-            'bouquets' => Product::where('type', Product::TYPE_BOUQUET)
-                ->with(['bouquetRecipe.items.product'])
-                ->orderBy('name')
-                ->get(),
         ]);
     }
 
@@ -32,8 +26,6 @@ class OrderController extends Controller
             'delivery_type' => ['required', 'string', 'max:255'],
             'total' => ['required', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:500'],
-            'bouquet_product_id' => ['nullable', 'integer', 'exists:products,id'],
-            'quantity' => ['nullable', 'numeric', 'min:1'],
         ]);
 
         $customer = null;
@@ -45,7 +37,7 @@ class OrderController extends Controller
             ]);
         }
 
-        $order = Order::create([
+        Order::create([
             'customer_id' => $customer?->id,
             'status' => Order::STATUS_NEW,
             'delivery_type' => $validated['delivery_type'],
@@ -58,34 +50,6 @@ class OrderController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        if ($validated['bouquet_product_id'] && $validated['quantity']) {
-            OrderItem::create([
-                'order_id' => $order->id,
-                'product_id' => $validated['bouquet_product_id'],
-                'qty' => $validated['quantity'],
-                'price' => 0,
-                'discount' => 0,
-            ]);
-        }
-
         return back()->with('success', 'Заказ создан и добавлен в очередь.');
-    }
-
-    public function updateStatus(Request $request, Order $order): RedirectResponse
-    {
-        $validated = $request->validate([
-            'status' => ['required', 'string', 'in:'.implode(',', [
-                Order::STATUS_NEW,
-                Order::STATUS_IN_PROGRESS,
-                Order::STATUS_READY,
-                Order::STATUS_DELIVERED,
-                Order::STATUS_COMPLETED,
-                Order::STATUS_CANCELLED,
-            ])],
-        ]);
-
-        $order->update(['status' => $validated['status']]);
-
-        return back()->with('success', 'Статус заказа обновлён.');
     }
 }

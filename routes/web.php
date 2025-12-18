@@ -28,11 +28,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
     Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
-    Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.update-status');
 
     Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
     Route::post('inventory', [InventoryController::class, 'store'])->name('inventory.store');
-    Route::post('inventory/recipes', [InventoryController::class, 'storeRecipe'])->name('inventory.recipes.store');
 
     Route::get('comments', function () {
         return Inertia::render('comments/index', [

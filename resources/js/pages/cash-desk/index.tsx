@@ -112,15 +112,14 @@ export default function CashDeskIndex({ auth, payments, methodTotals, paymentsTo
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="order_id">ID заказа</Label>
+                                        <Label htmlFor="order_id">Заказ (необязательно)</Label>
                                         <Input
                                             id="order_id"
                                             type="number"
                                             min={1}
                                             value={paymentForm.data.order_id}
                                             onChange={(event) => paymentForm.setData('order_id', event.target.value)}
-                                            placeholder="Номер заказа"
-                                            required
+                                            placeholder="ID заказа"
                                         />
                                         {paymentForm.errors.order_id && (
                                             <p className="text-xs text-destructive">{paymentForm.errors.order_id}</p>
@@ -133,7 +132,7 @@ export default function CashDeskIndex({ auth, payments, methodTotals, paymentsTo
                                         <Receipt className="mr-2 h-4 w-4" />Провести оплату
                                     </Button>
                                     <p className="text-xs text-muted-foreground">
-                                        Сумма мгновенно попадёт в отчёт и отметится в заказе по указанному номеру.
+                                        Сумма мгновенно попадёт в отчёт и отметится в заказе, если указан ID.
                                     </p>
                                 </div>
                             </form>

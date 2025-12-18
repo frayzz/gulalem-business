@@ -52,3 +52,12 @@ export const login = createRoute('/login');
 export const register = createRoute('/register');
 export const logout = createRoute('/logout', 'post');
 export const switchStore = createRoute('/stores/switch', 'post');
+
+export default {
+    home,
+    dashboard,
+    login,
+    register,
+    logout,
+    switchStore,
+};

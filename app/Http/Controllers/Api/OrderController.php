@@ -149,6 +149,10 @@ class OrderController extends Controller
 
     protected function handleInventoryState(Order $order, ?string $oldStatus, string $newStatus): void
     {
+        if ($newStatus !== Order::STATUS_CANCELED) {
+            $this->inventory->assertAvailabilityForOrder($order);
+        }
+
         if ($oldStatus === null && $newStatus !== Order::STATUS_CANCELED) {
             $this->inventory->reserveForOrder($order);
             return;

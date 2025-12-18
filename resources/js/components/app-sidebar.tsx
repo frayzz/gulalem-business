@@ -33,12 +33,12 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Заказы',
-        href: `${dashboard()}#orders`,
+        href: '/orders',
         icon: ClipboardList,
     },
     {
         title: 'Склад',
-        href: `${dashboard()}#inventory`,
+        href: '/inventory',
         icon: PackageSearch,
     },
     {
@@ -52,8 +52,8 @@ const mainNavItems: NavItem[] = [
         icon: Users,
     },
     {
-        title: 'Отчёты',
-        href: `${dashboard()}#reports`,
+        title: 'Комменты',
+        href: '/comments',
         icon: BarChart3,
     },
 ];

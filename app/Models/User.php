@@ -63,7 +63,7 @@ class User extends Authenticatable
      */
     public function stores()
     {
-        return $this->belongsToMany(Store::class)->withTimestamps();
+        return $this->belongsToMany(Store::class, 'shop_user', 'user_id', 'shop_id')->withTimestamps();
     }
 
     /**

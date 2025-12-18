@@ -36,10 +36,23 @@ class OrderController extends Controller
         $customer = null;
 
         if ($validated['customer_name'] || $validated['customer_phone']) {
-            $customer = Customer::create([
-                'name' => $validated['customer_name'],
-                'phone' => $validated['customer_phone'],
-            ]);
+            $normalizedPhone = Customer::normalizePhone($validated['customer_phone']);
+
+            $customer = Customer::query()
+                ->when($normalizedPhone, fn ($query) => $query->where('phone', $normalizedPhone))
+                ->first();
+
+            if ($customer) {
+                $customer->update([
+                    'name' => $customer->name ?: $validated['customer_name'],
+                    'phone' => $normalizedPhone,
+                ]);
+            } else {
+                $customer = Customer::create([
+                    'name' => $validated['customer_name'],
+                    'phone' => $normalizedPhone,
+                ]);
+            }
         }
 
         Order::create([

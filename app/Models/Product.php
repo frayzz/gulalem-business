@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
@@ -21,6 +22,24 @@ class Product extends Model
         'active',
         'default_price',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Product $product) {
+            if (empty($product->sku)) {
+                $product->sku = self::generateSku();
+            }
+        });
+    }
+
+    public static function generateSku(): string
+    {
+        do {
+            $sku = Str::upper(Str::random(10));
+        } while (self::where('sku', $sku)->exists());
+
+        return $sku;
+    }
 
     /**
      * @return \Illuminate\Database\Eloquent\Relations\HasMany<ProductBatch>

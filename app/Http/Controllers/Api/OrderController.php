@@ -109,7 +109,13 @@ class OrderController extends Controller
             $this->inventory->consumeForOrder($order);
         }
 
-        return $order->refresh()->load(['items.product', 'payments']);
+        $order->refresh()->load(['items.product', 'payments']);
+
+        if ($request->expectsJson()) {
+            return $order;
+        }
+
+        return back()->with('success', 'Статус заказа обновлён');
     }
 
     public function pay(Request $request, Order $order)
@@ -138,9 +144,17 @@ class OrderController extends Controller
             $paidTotal += $payment['amount'];
         }
 
+        $paymentStatus = 'pending';
+
+        if ($paidTotal >= $order->total) {
+            $paymentStatus = 'paid';
+        } elseif ($paidTotal > 0) {
+            $paymentStatus = 'partial';
+        }
+
         $order->update([
             'paid_total' => $paidTotal,
-            'payment_status' => $paidTotal >= $order->total ? 'paid' : 'partial',
+            'payment_status' => $paymentStatus,
         ]);
     }
 }

@@ -27,7 +27,26 @@ class CustomerController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        Customer::create($validated);
+        $normalizedPhone = Customer::normalizePhone($validated['phone'] ?? null);
+
+        $customer = Customer::query()
+            ->when($normalizedPhone, fn ($query) => $query->where('phone', $normalizedPhone))
+            ->first();
+
+        if ($customer) {
+            $customer->fill([
+                'name' => $validated['name'],
+                'email' => $validated['email'] ?? $customer->email,
+                'birthday' => $validated['birthday'] ?? $customer->birthday,
+                'notes' => $validated['notes'] ?? $customer->notes,
+                'phone' => $normalizedPhone,
+            ])->save();
+        } else {
+            Customer::create([
+                ...$validated,
+                'phone' => $normalizedPhone,
+            ]);
+        }
 
         return back()->with('success', 'Клиент добавлен в базу.');
     }

@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\StoreSwitchController;
 use App\Models\Order;
 use App\Models\ProductBatch;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +40,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
     Route::post('inventory', [InventoryController::class, 'store'])->name('inventory.store');
     Route::post('inventory/recipes', [InventoryController::class, 'storeRecipe'])->name('inventory.recipes.store');
+
+    Route::post('stores/switch', StoreSwitchController::class)->name('stores.switch');
 
     Route::get('comments', function () {
         return Inertia::render('comments/index', [

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\PaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,7 +46,7 @@ class CashDeskController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, PaymentService $paymentService): RedirectResponse
     {
         $validated = $request->validate([
             'method' => ['required', 'string', 'max:50'],
@@ -53,21 +54,11 @@ class CashDeskController extends Controller
             'order_id' => ['nullable', 'integer', 'exists:orders,id'],
         ]);
 
-        $payment = Payment::create([
+        $paymentService->registerPayment([
             'order_id' => $validated['order_id'] ?? null,
             'method' => $validated['method'],
             'amount' => $validated['amount'],
         ]);
-
-        if ($payment->order_id) {
-            $order = Order::find($payment->order_id);
-
-            if ($order) {
-                $order->paid_total = (float) $order->paid_total + (float) $payment->amount;
-                $order->payment_status = $order->paid_total >= (float) $order->total ? 'paid' : 'partial';
-                $order->save();
-            }
-        }
 
         return back()->with('success', 'Оплата проведена через кассу.');
     }

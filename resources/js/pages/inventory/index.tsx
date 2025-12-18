@@ -1,11 +1,14 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
 import { Leaf } from 'lucide-react';
+import { FormEvent } from 'react';
 
 interface InventoryPageProps extends PageProps {
     batches: {
@@ -32,6 +35,20 @@ function formatDate(value?: string | null) {
 }
 
 export default function InventoryIndex({ batches, auth }: InventoryPageProps) {
+    const batchForm = useForm({
+        product_name: '',
+        quantity: '',
+        arrived_at: '',
+        expires_at: '',
+    });
+
+    const submitBatch = (event: FormEvent) => {
+        event.preventDefault();
+        batchForm.post('/inventory', {
+            onSuccess: () => batchForm.reset(),
+        });
+    };
+
     return (
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="Склад" />
@@ -43,6 +60,77 @@ export default function InventoryIndex({ batches, auth }: InventoryPageProps) {
                         Активные партии по FIFO и контроль срока годности
                     </p>
                 </div>
+
+                <Card className="border-border/80">
+                    <CardHeader>
+                        <CardTitle>Быстрое поступление</CardTitle>
+                        <CardDescription>Добавьте партию — она сразу попадёт в список</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form className="grid gap-4 md:grid-cols-2" onSubmit={submitBatch}>
+                            <div className="space-y-2">
+                                <Label htmlFor="product_name">Товар</Label>
+                                <Input
+                                    id="product_name"
+                                    value={batchForm.data.product_name}
+                                    onChange={(event) => batchForm.setData('product_name', event.target.value)}
+                                    placeholder="Роза, тюльпан и т.д."
+                                    required
+                                />
+                                {batchForm.errors.product_name && (
+                                    <p className="text-xs text-destructive">{batchForm.errors.product_name}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="quantity">Количество</Label>
+                                <Input
+                                    id="quantity"
+                                    type="number"
+                                    min={1}
+                                    value={batchForm.data.quantity}
+                                    onChange={(event) => batchForm.setData('quantity', event.target.value)}
+                                    required
+                                />
+                                {batchForm.errors.quantity && (
+                                    <p className="text-xs text-destructive">{batchForm.errors.quantity}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="arrived_at">Дата поступления</Label>
+                                <Input
+                                    id="arrived_at"
+                                    type="date"
+                                    value={batchForm.data.arrived_at}
+                                    onChange={(event) => batchForm.setData('arrived_at', event.target.value)}
+                                />
+                                {batchForm.errors.arrived_at && (
+                                    <p className="text-xs text-destructive">{batchForm.errors.arrived_at}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="expires_at">Срок годности</Label>
+                                <Input
+                                    id="expires_at"
+                                    type="date"
+                                    value={batchForm.data.expires_at}
+                                    onChange={(event) => batchForm.setData('expires_at', event.target.value)}
+                                />
+                                {batchForm.errors.expires_at && (
+                                    <p className="text-xs text-destructive">{batchForm.errors.expires_at}</p>
+                                )}
+                            </div>
+                            <div className="md:col-span-2">
+                                <button
+                                    type="submit"
+                                    className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                                    disabled={batchForm.processing}
+                                >
+                                    Добавить партию
+                                </button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
 
                 <Card>
                     <CardHeader>

@@ -59,6 +59,26 @@ class User extends Authenticatable
     }
 
     /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<Store>
+     */
+    public function stores()
+    {
+        return $this->belongsToMany(Store::class)->withTimestamps();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Store>
+     */
+    public function accessibleStores()
+    {
+        if ($this->hasRole(['owner'])) {
+            return Store::query()->orderBy('name')->get();
+        }
+
+        return $this->stores()->orderBy('name')->get();
+    }
+
+    /**
      * Проверяет наличие хотя бы одной из запрошенных ролей.
      *
      * @param  string[]  $roles

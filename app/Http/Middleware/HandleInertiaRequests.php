@@ -41,13 +41,17 @@ class HandleInertiaRequests extends Middleware
 
         $stores = app(Stores::class);
         $currentStoreId = $stores->currentId();
+        $user = $request->user();
 
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
+            ],
+            'abilities' => [
+                'manageStores' => $user?->hasRole(['owner']) ?? false,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'stores' => $stores->all()->values(),

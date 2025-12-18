@@ -36,6 +36,8 @@ class InventoryController extends Controller
     {
         $validated = $request->validate([
             'product_name' => ['required', 'string', 'max:255'],
+            'product_price' => ['required', 'numeric', 'min:0'],
+            'buy_price' => ['required', 'numeric', 'min:0'],
             'quantity' => ['required', 'numeric', 'min:1'],
             'arrived_at' => ['nullable', 'date'],
             'expires_at' => ['nullable', 'date', 'after_or_equal:arrived_at'],
@@ -48,14 +50,18 @@ class InventoryController extends Controller
                 'unit' => 'шт',
                 'sku' => null,
                 'active' => true,
-                'default_price' => 0,
+                'default_price' => $validated['product_price'],
             ],
         );
+
+        if ($product->default_price !== $validated['product_price']) {
+            $product->update(['default_price' => $validated['product_price']]);
+        }
 
         ProductBatch::create([
             'product_id' => $product->id,
             'supplier_id' => null,
-            'buy_price' => 0,
+            'buy_price' => $validated['buy_price'],
             'qty_in' => $validated['quantity'],
             'qty_left' => $validated['quantity'],
             'arrived_at' => $validated['arrived_at'],
@@ -69,6 +75,7 @@ class InventoryController extends Controller
     {
         $validated = $request->validate([
             'bouquet_name' => ['required', 'string', 'max:255'],
+            'bouquet_price' => ['required', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.name' => ['required', 'string', 'max:255'],
             'items.*.qty' => ['required', 'numeric', 'min:0.001'],
@@ -81,9 +88,13 @@ class InventoryController extends Controller
                 'unit' => 'шт',
                 'active' => true,
                 'sku' => null,
-                'default_price' => 0,
+                'default_price' => $validated['bouquet_price'],
             ],
         );
+
+        if ($bouquet->default_price !== $validated['bouquet_price']) {
+            $bouquet->update(['default_price' => $validated['bouquet_price']]);
+        }
 
         $recipe = BouquetRecipe::firstOrCreate([
             'bouquet_product_id' => $bouquet->id,

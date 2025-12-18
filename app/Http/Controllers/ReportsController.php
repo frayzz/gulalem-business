@@ -10,7 +10,7 @@ class ReportsController extends Controller
 {
     public function __invoke(): Response
     {
-        return Inertia::render('reports/index', [
+        return Inertia::render('reports', [
             ...app(DashboardData::class)->build(),
         ]);
     }

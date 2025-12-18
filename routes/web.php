@@ -1,6 +1,10 @@
 <?php
 
+use App\Http\Controllers\CashDeskController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\OrderController;
 use App\Models\Order;
 use App\Models\ProductBatch;
 use Illuminate\Support\Facades\Route;
@@ -16,17 +20,17 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
-    Route::get('orders', function () {
-        return Inertia::render('orders/index', [
-            'orders' => Order::with(['customer', 'payments'])->latest()->paginate(15),
-        ]);
-    })->name('orders.index');
+    Route::get('cash-desk', [CashDeskController::class, 'index'])->name('cash-desk.index');
+    Route::post('cash-desk/payments', [CashDeskController::class, 'store'])->name('cash-desk.payments.store');
 
-    Route::get('inventory', function () {
-        return Inertia::render('inventory/index', [
-            'batches' => ProductBatch::with('product')->latest('arrived_at')->paginate(15),
-        ]);
-    })->name('inventory.index');
+    Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
+    Route::post('customers', [CustomerController::class, 'store'])->name('customers.store');
+
+    Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
+
+    Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    Route::post('inventory', [InventoryController::class, 'store'])->name('inventory.store');
 
     Route::get('comments', function () {
         return Inertia::render('comments/index', [

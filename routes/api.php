@@ -13,8 +13,8 @@ Route::middleware(['auth:sanctum', 'role:owner,admin,seller,florist'])->group(fu
     Route::apiResource('products', ProductController::class);
     Route::post('products/{product}/deactivate', [ProductController::class, 'deactivate']);
 
-    Route::apiResource('customers', CustomerController::class)->only(['index', 'store', 'update', 'show']);
     Route::get('customers/lookup', [CustomerController::class, 'lookup']);
+    Route::apiResource('customers', CustomerController::class)->only(['index', 'store', 'update', 'show']);
 
     Route::apiResource('product-batches', ProductBatchController::class)->only(['index', 'store']);
 

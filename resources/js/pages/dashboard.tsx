@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
 import {
     AlertTriangle,
@@ -232,17 +232,26 @@ export default function Dashboard({
         return statusFlow[currentIndex + 1];
     };
 
-    const handleAdvanceStatus = (id: number) => {
+    const handleAdvanceStatus = (id: number, currentStatus: PipelineStatus) => {
+        const next = getNextStatus(currentStatus);
+
+        if (!next) return;
+
         setOrderCards((prev) =>
-            prev.map((order) => {
-                if (order.id !== id) return order;
+            prev.map((order) => (order.id === id ? { ...order, status: next } : order)),
+        );
 
-                const next = getNextStatus(order.status as PipelineStatus);
-
-                if (!next) return order;
-
-                return { ...order, status: next };
-            }),
+        router.post(
+            `/api/orders/${id}/status`,
+            { status: next },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: () =>
+                    setOrderCards((prev) =>
+                        prev.map((order) => (order.id === id ? { ...order, status: currentStatus } : order)),
+                    ),
+            },
         );
     };
 
@@ -471,7 +480,12 @@ export default function Dashboard({
                                                                 variant={next ? 'default' : 'outline'}
                                                                 className="gap-2"
                                                                 disabled={!next}
-                                                                onClick={() => handleAdvanceStatus(order.id)}
+                                                                onClick={() =>
+                                                                    handleAdvanceStatus(
+                                                                        order.id,
+                                                                        order.status as PipelineStatus,
+                                                                    )
+                                                                }
                                                             >
                                                                 <ClipboardList className="h-4 w-4" />
                                                                 {next ? actionLabel : 'Финальный статус'}
@@ -480,7 +494,12 @@ export default function Dashboard({
                                                                 size="icon"
                                                                 variant="ghost"
                                                                 disabled={!next}
-                                                                onClick={() => handleAdvanceStatus(order.id)}
+                                                                onClick={() =>
+                                                                    handleAdvanceStatus(
+                                                                        order.id,
+                                                                        order.status as PipelineStatus,
+                                                                    )
+                                                                }
                                                                 aria-label="Продвинуть заказ"
                                                             >
                                                                 <ArrowRight className="h-4 w-4" />

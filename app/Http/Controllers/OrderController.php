@@ -18,6 +18,11 @@ class OrderController extends Controller
         ]);
     }
 
+    public function create(): RedirectResponse
+    {
+        return redirect()->route('orders.index');
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([

@@ -167,7 +167,7 @@ export default function OrdersIndex({ orders, products, auth }: OrdersPageProps)
         const controller = new AbortController();
         const handle = setTimeout(() => {
             setIsCustomerLookupLoading(true);
-            fetch(`/api/customers/lookup?phone=${encodeURIComponent(orderForm.data.customer_phone)}`, {
+            fetch(`/customers/lookup?phone=${encodeURIComponent(orderForm.data.customer_phone)}`, {
                 signal: controller.signal,
                 headers: {
                     Accept: 'application/json',

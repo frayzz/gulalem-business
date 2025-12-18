@@ -36,6 +36,7 @@ export interface SharedData {
     sidebarOpen: boolean;
     stores?: Store[];
     currentStoreId?: number | null;
+    currentStore?: Store | null;
     [key: string]: unknown;
 }
 

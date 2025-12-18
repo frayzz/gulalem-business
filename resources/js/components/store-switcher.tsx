@@ -15,12 +15,12 @@ import { Building2, Check, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 export function StoreSwitcher() {
-    const { stores = [], currentStoreId } = usePage<SharedData>().props;
+    const { stores = [], currentStoreId, currentStore: currentStoreProp } = usePage<SharedData>().props;
     const [pendingStoreId, setPendingStoreId] = useState<number | null>(null);
 
     const currentStore = useMemo<Store | undefined>(
-        () => stores.find((store) => store.id === currentStoreId) ?? stores[0],
-        [currentStoreId, stores],
+        () => currentStoreProp ?? stores.find((store) => store.id === currentStoreId) ?? stores[0],
+        [currentStoreId, currentStoreProp, stores],
     );
 
     if (!stores.length || !currentStore) {
@@ -37,7 +37,11 @@ export function StoreSwitcher() {
             { store_id: storeId },
             {
                 preserveScroll: true,
-                preserveState: true,
+                onSuccess: () =>
+                    router.reload({
+                        only: ['stores', 'currentStoreId', 'currentStore'],
+                        preserveScroll: true,
+                    }),
                 onFinish: () => setPendingStoreId(null),
             },
         );

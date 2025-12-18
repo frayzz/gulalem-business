@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Stores;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -38,13 +39,8 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
-        $stores = collect(config('stores', []));
-
-        $currentStoreId = $request->session()->get('current_store_id');
-
-        if (! $stores->firstWhere('id', $currentStoreId)) {
-            $currentStoreId = $stores->first()['id'] ?? null;
-        }
+        $stores = app(Stores::class);
+        $currentStoreId = $stores->currentId();
 
         return [
             ...parent::share($request),
@@ -54,8 +50,9 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-            'stores' => $stores->values(),
+            'stores' => $stores->all()->values(),
             'currentStoreId' => $currentStoreId,
+            'currentStore' => $stores->current(),
         ];
     }
 }

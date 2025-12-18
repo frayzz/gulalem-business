@@ -53,13 +53,13 @@ class DashboardController extends Controller
         $paymentsToday = Payment::whereDate('created_at', $today)->sum('amount');
         $ordersToday = Order::whereDate('created_at', $today)->count();
         $completedToday = Order::whereDate('created_at', $today)
-            ->where('status', Order::STATUS_COMPLETED)
+            ->where('status', Order::STATUS_DELIVERED)
             ->count();
 
         $crmSummary = [
             'activeOrders' => Order::whereNotIn('status', [
-                Order::STATUS_COMPLETED,
-                Order::STATUS_CANCELLED,
+                Order::STATUS_DELIVERED,
+                Order::STATUS_CANCELED,
             ])->count(),
             'upcomingDeliveries' => Order::whereNotNull('delivery_time')
                 ->where('delivery_time', '>=', $today->startOfDay())

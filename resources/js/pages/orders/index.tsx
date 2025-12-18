@@ -45,21 +45,27 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusLabels: Record<string, string> = {
-    new: 'Новый',
-    in_progress: 'В работе',
+    draft: 'Черновик',
+    confirmed: 'Подтверждён',
+    in_assembly: 'Сборка',
     ready: 'Готов',
     delivered: 'Доставлен',
-    completed: 'Завершён',
-    cancelled: 'Отменён',
+    canceled: 'Отменён',
 };
 
 const statusSteps: Record<string, string[]> = {
-    new: ['in_progress', 'cancelled'],
-    in_progress: ['ready', 'cancelled'],
-    ready: ['delivered', 'completed'],
-    delivered: ['completed'],
-    completed: [],
-    cancelled: [],
+    draft: ['confirmed', 'canceled'],
+    confirmed: ['in_assembly', 'canceled'],
+    in_assembly: ['ready'],
+    ready: ['delivered'],
+    delivered: [],
+    canceled: [],
+};
+
+const paymentLabels: Record<string, string> = {
+    paid: 'Оплачено',
+    partially_paid: 'Частично',
+    unpaid: 'Не оплачено',
 };
 
 const deliveryLabels: Record<string, string> = {
@@ -239,8 +245,16 @@ export default function OrdersIndex({ orders, auth }: OrdersPageProps) {
                                         </TableCell>
                                         <TableCell>{formatCurrency(order.total)}</TableCell>
                                         <TableCell>
-                                            <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
-                                                {order.payment_status === 'paid' ? 'Оплачено' : 'Ожидает'}
+                                            <Badge
+                                                variant={
+                                                    order.payment_status === 'paid'
+                                                        ? 'default'
+                                                        : order.payment_status === 'partially_paid'
+                                                          ? 'outline'
+                                                          : 'secondary'
+                                                }
+                                            >
+                                                {paymentLabels[order.payment_status] ?? order.payment_status}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>

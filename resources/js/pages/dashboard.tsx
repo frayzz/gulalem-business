@@ -83,13 +83,12 @@ interface InventoryAlerts {
 }
 
 type PipelineStatus =
-    | 'new'
-    | 'in_progress'
-    | 'processing'
+    | 'draft'
+    | 'confirmed'
+    | 'in_assembly'
     | 'ready'
     | 'delivered'
-    | 'completed'
-    | 'cancelled'
+    | 'canceled'
     | string;
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -97,34 +96,32 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusLabels: Record<string, string> = {
-    new: 'Новый',
-    in_progress: 'В работе',
-    processing: 'В работе',
+    draft: 'Черновик',
+    confirmed: 'Подтверждён',
+    in_assembly: 'Сборка',
     ready: 'Готов',
     delivered: 'Доставлен',
-    completed: 'Завершён',
-    cancelled: 'Отменён',
+    canceled: 'Отменён',
 };
 
 const statusHints: Record<string, string> = {
-    new: 'Примите заказ и уточните детали',
-    in_progress: 'Сборка и подготовка букета',
+    draft: 'Примите заказ и подтвердите состав',
+    confirmed: 'Резерв материалов создан',
+    in_assembly: 'Сборка и подготовка букета',
     ready: 'Ожидает передачи или выдачи',
-    delivered: 'Проверьте оплату и подтверждение',
-    completed: 'Закрытые сделки',
+    delivered: 'Заказ доставлен клиенту',
 };
 
 const statusActions: Record<string, string> = {
-    new: 'Принять в работу',
-    processing: 'Принять в работу',
-    in_progress: 'Отметить готов',
+    draft: 'Подтвердить',
+    confirmed: 'Отправить в сборку',
+    in_assembly: 'Отметить готов',
     ready: 'Передать клиенту/курьеру',
-    delivered: 'Закрыть заказ',
-    completed: 'Закрыт',
-    cancelled: 'Отменён',
+    delivered: 'Доставлен',
+    canceled: 'Отменён',
 };
 
-const statusFlow: PipelineStatus[] = ['new', 'in_progress', 'ready', 'delivered', 'completed'];
+const statusFlow: PipelineStatus[] = ['draft', 'confirmed', 'in_assembly', 'ready', 'delivered'];
 
 const deliveryLabels: Record<string, string> = {
     pickup: 'Самовывоз',
@@ -191,7 +188,7 @@ export default function Dashboard({
         },
         {
             title: 'Активные заказы',
-            value: orderCards.filter((order) => !['completed', 'cancelled'].includes(order.status)).length,
+            value: orderCards.filter((order) => !['delivered', 'canceled'].includes(order.status)).length,
             description: 'Всё, что ещё нужно довести до клиента',
             icon: Timer,
         },
@@ -243,9 +240,9 @@ export default function Dashboard({
 
     const activeInProgress = useMemo(
         () =>
-            (pipelineTotals.in_progress ?? 0) +
-            (pipelineTotals.processing ?? 0) +
-            (pipelineTotals.new ?? 0),
+            (pipelineTotals.draft ?? 0) +
+            (pipelineTotals.confirmed ?? 0) +
+            (pipelineTotals.in_assembly ?? 0),
         [pipelineTotals],
     );
 
@@ -255,8 +252,6 @@ export default function Dashboard({
     );
 
     const getNextStatus = (current: PipelineStatus) => {
-        if (current === 'processing') return 'in_progress';
-
         const currentIndex = statusFlow.indexOf(current);
 
         if (currentIndex === -1 || currentIndex === statusFlow.length - 1) return undefined;

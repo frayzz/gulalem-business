@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Inventory\InventoryService;
 use App\Models\BouquetRecipe;
 use App\Models\BouquetRecipeItem;
 use App\Models\Product;
@@ -13,6 +14,10 @@ use Inertia\Response;
 
 class InventoryController extends Controller
 {
+    public function __construct(private InventoryService $inventory)
+    {
+    }
+
     public function index(): Response
     {
         return Inertia::render('inventory/index', [
@@ -28,6 +33,15 @@ class InventoryController extends Controller
                         'qty' => (string) $item->qty,
                         'product' => $item->product?->only(['id', 'name']),
                     ]),
+                ]),
+            'products' => Product::whereIn('type', [Product::TYPE_FLOWER, Product::TYPE_MATERIAL])
+                ->orderBy('name')
+                ->get()
+                ->map(fn (Product $product) => [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'unit' => $product->unit,
+                    'available_qty' => $this->inventory->getAvailableQty($product),
                 ]),
         ]);
     }
@@ -77,7 +91,7 @@ class InventoryController extends Controller
             'bouquet_name' => ['required', 'string', 'max:255'],
             'bouquet_price' => ['required', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.name' => ['required', 'string', 'max:255'],
+            'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.qty' => ['required', 'numeric', 'min:0.001'],
         ]);
 
@@ -103,16 +117,12 @@ class InventoryController extends Controller
         $recipe->items()->delete();
 
         foreach ($validated['items'] as $item) {
-            $component = Product::firstOrCreate(
-                ['name' => $item['name']],
-                [
-                    'type' => Product::TYPE_MATERIAL,
-                    'unit' => 'шт',
-                    'active' => true,
-                    'sku' => null,
-                    'default_price' => 0,
-                ],
-            );
+            /** @var Product|null $component */
+            $component = Product::find($item['product_id']);
+
+            if (!$component || $component->type === Product::TYPE_BOUQUET) {
+                return back()->withErrors(['items' => 'Компоненты букета должны быть выбраны из склада.']);
+            }
 
             $recipe->items()->create([
                 'product_id' => $component->id,

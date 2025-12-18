@@ -286,8 +286,8 @@ export default function Dashboard({
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
 
-            <div className="space-y-6">
-                <div className="flex flex-col gap-4 rounded-xl border bg-gradient-to-r from-background via-background/80 to-background/60 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+            <div className="space-y-6 px-4 pb-8 sm:px-6 lg:px-8">
+                <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-r from-background via-background/80 to-background/60 p-4 shadow-sm sm:p-6 md:flex-row md:items-center md:justify-between">
                     <div className="space-y-2">
                         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
                             <span className="inline-flex h-6 items-center rounded-md bg-primary/10 px-2 text-primary">CRM</span>
@@ -543,8 +543,8 @@ export default function Dashboard({
                             </Button>
                         </div>
                     </CardHeader>
-                    <CardContent className="overflow-x-auto">
-                        <div className="grid min-w-full gap-4 md:grid-cols-2 xl:grid-cols-5">
+                    <CardContent className="overflow-x-auto px-1 sm:px-3">
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                             {boardColumns.map((column) => (
                                 <div key={column.status} className="flex h-full flex-col gap-3 rounded-xl border bg-muted/20 p-3">
                                     <div className="flex items-center justify-between">

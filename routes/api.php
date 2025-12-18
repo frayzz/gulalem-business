@@ -9,7 +9,7 @@ use App\Http\Controllers\Api\ProductBatchController;
 use App\Http\Controllers\Api\ProductController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'role:owner,admin,seller,florist'])->group(function () {
+Route::middleware(['auth:sanctum', 'role:owner,admin,seller,florist'])->group(function () {
     Route::apiResource('products', ProductController::class);
     Route::post('products/{product}/deactivate', [ProductController::class, 'deactivate']);
 

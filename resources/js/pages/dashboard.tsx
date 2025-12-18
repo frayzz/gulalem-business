@@ -6,7 +6,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
-import { Banknote, ClipboardList, Leaf, PackageSearch, ReceiptText } from 'lucide-react';
+import { Banknote, ClipboardList, Leaf, PackageSearch } from 'lucide-react';
 
 interface DashboardProps extends PageProps {
     orders: OrderResource[];
@@ -248,98 +248,6 @@ export default function Dashboard({ auth, orders, inventory, paymentsToday, orde
                         )}
                     </CardContent>
                 </Card>
-
-                <section className="grid gap-4 lg:grid-cols-2" id="cash-desk">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <div>
-                                <CardTitle>Как добавить товар</CardTitle>
-                                <CardDescription>Шаги для создания позиции и оприходования партии</CardDescription>
-                            </div>
-                            <Badge variant="secondary">API</Badge>
-                        </CardHeader>
-                        <CardContent className="space-y-4 text-sm leading-relaxed">
-                            <ol className="list-decimal space-y-2 pl-4 text-muted-foreground">
-                                <li>
-                                    Создайте товар через <code>POST /api/products</code> с полями <code>name</code>,
-                                    <code>sku</code>, <code>type</code>, <code>unit</code>, <code>default_price</code>.
-                                </li>
-                                <li>
-                                    Оформите приход партии на склад через <code>POST /api/inventory/intake</code> — укажите
-                                    <code>product_id</code>, <code>qty</code>, себестоимость и даты поступления/годности.
-                                </li>
-                                <li>
-                                    Обновите остаток или спишите брак командой <code>POST /api/inventory/write-off</code>
-                                    (нужно лишь <code>product_id</code> и <code>qty</code>).
-                                </li>
-                            </ol>
-
-                            <div className="rounded-lg bg-muted/40 p-3 font-mono text-xs text-muted-foreground">
-                                {`# пример: создать товар
-curl -X POST /api/products \\
-  -H "Accept: application/json" \\
-  -b "$AUTH_COOKIES" \\
-  -d "type=sku" -d "name=Розы красные" -d "unit=шт" -d "sku=ROSE-RED" -d "default_price=500"
-
-# пример: оприходовать 25 шт по 250 ₽
-curl -X POST /api/inventory/intake \\
-  -H "Accept: application/json" \\
-  -b "$AUTH_COOKIES" \\
-  -d "product_id=1" -d "qty=25" -d "buy_price=250" -d "arrived_at=2025-02-18" -d "expires_at=2025-02-28"`}
-                            </div>
-
-                            <p className="text-xs text-muted-foreground">
-                                Все запросы требуют авторизации: выполните вход в панели и используйте Cookie/Authorization, которые
-                                выдаёт Laravel Sanctum.
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <div>
-                                <CardTitle>Касса и смены</CardTitle>
-                                <CardDescription>Открытие, закрытие и контроль наличности</CardDescription>
-                            </div>
-                            <ReceiptText className="h-5 w-5 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent className="space-y-4 text-sm leading-relaxed">
-                            <ol className="list-decimal space-y-2 pl-4 text-muted-foreground">
-                                <li>
-                                    Откройте смену: <code>POST /api/cash-shifts</code> с <code>opened_at</code> и
-                                    <code>cash_start</code> (начальный остаток).
-                                </li>
-                                <li>
-                                    Ведите выручку: при оплатах вызывайте <code>POST /api/orders/{id}/pay</code> — суммы
-                                    попадут в отчёты и смену.
-                                </li>
-                                <li>
-                                    Закройте смену: <code>PATCH /api/cash-shifts/{id}</code> с <code>closed_at</code> и
-                                    <code>cash_end</code> для фиксации кассы.
-                                </li>
-                            </ol>
-
-                            <div className="rounded-lg bg-muted/40 p-3 font-mono text-xs text-muted-foreground">
-                                {`# открыть смену с кассой 10 000 ₽
-curl -X POST /api/cash-shifts \\
-  -H "Accept: application/json" \\
-  -b "$AUTH_COOKIES" \\
-  -d "opened_at=2025-02-18 10:00:00" -d "cash_start=10000"
-
-# закрыть смену
-curl -X PATCH /api/cash-shifts/1 \\
-  -H "Accept: application/json" \\
-  -b "$AUTH_COOKIES" \\
-  -d "closed_at=2025-02-18 22:00:00" -d "cash_end=14500"`}
-                            </div>
-
-                            <p className="text-xs text-muted-foreground">
-                                Список смен доступен через <code>GET /api/cash-shifts</code>, каждое действие привязывается к
-                                пользователю, который авторизован в панели.
-                            </p>
-                        </CardContent>
-                    </Card>
-                </section>
             </div>
         </AppLayout>
     );

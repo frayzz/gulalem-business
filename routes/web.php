@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CashDeskController;
+use App\Http\Controllers\Api\CustomerController as ApiCustomerController;
 use App\Http\Controllers\Api\OrderController as ApiOrderController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -26,6 +27,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::post('customers', [CustomerController::class, 'store'])->name('customers.store');
+    Route::get('customers/lookup', [ApiCustomerController::class, 'lookup'])->name('customers.lookup');
 
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');

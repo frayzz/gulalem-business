@@ -21,6 +21,10 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
+Route::middleware('auth')->group(function () {
+    Route::post('stores/switch', StoreSwitchController::class)->name('stores.switch');
+});
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('reports', ReportsController::class)->name('reports');
@@ -40,8 +44,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
     Route::post('inventory', [InventoryController::class, 'store'])->name('inventory.store');
     Route::post('inventory/recipes', [InventoryController::class, 'storeRecipe'])->name('inventory.recipes.store');
-
-    Route::post('stores/switch', StoreSwitchController::class)->name('stores.switch');
 
     Route::get('comments', function () {
         return Inertia::render('comments/index', [

@@ -6,7 +6,20 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import type { PageProps } from '@inertiajs/shared';
-import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, ClipboardList, Leaf, PackageSearch, Users } from 'lucide-react';
+import {
+    AlertTriangle,
+    ArrowRight,
+    Banknote,
+    CalendarClock,
+    CheckCircle2,
+    ClipboardList,
+    Leaf,
+    PackageSearch,
+    Timer,
+    Truck,
+    Users,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface DashboardProps extends PageProps {
     orders: OrderResource[];
@@ -58,6 +71,16 @@ interface InventoryAlerts {
     lowStock: number;
 }
 
+type PipelineStatus =
+    | 'new'
+    | 'in_progress'
+    | 'processing'
+    | 'ready'
+    | 'delivered'
+    | 'completed'
+    | 'cancelled'
+    | string;
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
 ];
@@ -71,6 +94,26 @@ const statusLabels: Record<string, string> = {
     completed: 'Завершён',
     cancelled: 'Отменён',
 };
+
+const statusHints: Record<string, string> = {
+    new: 'Примите заказ и уточните детали',
+    in_progress: 'Сборка и подготовка букета',
+    ready: 'Ожидает передачи или выдачи',
+    delivered: 'Проверьте оплату и подтверждение',
+    completed: 'Закрытые сделки',
+};
+
+const statusActions: Record<string, string> = {
+    new: 'Принять в работу',
+    processing: 'Принять в работу',
+    in_progress: 'Отметить готов',
+    ready: 'Передать клиенту/курьеру',
+    delivered: 'Закрыть заказ',
+    completed: 'Закрыт',
+    cancelled: 'Отменён',
+};
+
+const statusFlow: PipelineStatus[] = ['new', 'in_progress', 'ready', 'delivered', 'completed'];
 
 const deliveryLabels: Record<string, string> = {
     pickup: 'Самовывоз',
@@ -101,6 +144,12 @@ export default function Dashboard({
     pipeline,
     inventoryAlerts,
 }: DashboardProps) {
+    const [orderCards, setOrderCards] = useState<OrderResource[]>(orders);
+
+    useEffect(() => {
+        setOrderCards(orders);
+    }, [orders]);
+
     const summaryCards = [
         {
             title: 'Выручка сегодня',
@@ -109,10 +158,10 @@ export default function Dashboard({
             icon: Banknote,
         },
         {
-            title: 'Закрыто',
-            value: completedToday,
-            description: 'Заказы со статусом «Завершён»',
-            icon: ClipboardList,
+            title: 'Активные заказы',
+            value: orderCards.filter((order) => !['completed', 'cancelled'].includes(order.status)).length,
+            description: 'Всё, что ещё нужно довести до клиента',
+            icon: Timer,
         },
         {
             title: 'Партии на складе',
@@ -122,35 +171,111 @@ export default function Dashboard({
         },
     ];
 
-    const pipelineTotals = pipeline.reduce<Record<string, number>>((acc, item) => {
-        acc[item.status] = item.total;
-        return acc;
-    }, {});
+    const pipelineStatuses = useMemo(() => {
+        const unique = new Set<PipelineStatus>([
+            ...statusFlow,
+            ...pipeline.map((item) => item.status as PipelineStatus),
+            ...orderCards.map((order) => order.status as PipelineStatus),
+        ]);
 
-    const basePipelineStatuses = ['new', 'in_progress', 'ready', 'delivered', 'completed', 'cancelled'];
-    const pipelineStatuses = [
-        ...basePipelineStatuses,
-        ...pipeline.map((item) => item.status).filter((status) => !basePipelineStatuses.includes(status)),
-    ];
+        return Array.from(unique);
+    }, [orderCards, pipeline]);
+
+    const sortedStatuses = useMemo(
+        () => [
+            ...statusFlow,
+            ...pipelineStatuses.filter((status) => !statusFlow.includes(status)).sort(),
+        ],
+        [pipelineStatuses],
+    );
+
+    const pipelineTotals = useMemo(() => {
+        const totals: Record<PipelineStatus, number> = {};
+
+        orderCards.forEach((order) => {
+            const status = order.status as PipelineStatus;
+            totals[status] = (totals[status] ?? 0) + 1;
+        });
+
+        return totals;
+    }, [orderCards]);
+
+    const boardColumns = useMemo(
+        () =>
+            sortedStatuses.map((status) => ({
+                status,
+                orders: orderCards.filter((order) => order.status === status),
+            })),
+        [orderCards, sortedStatuses],
+    );
+
+    const activeInProgress = useMemo(
+        () =>
+            (pipelineTotals.in_progress ?? 0) +
+            (pipelineTotals.processing ?? 0) +
+            (pipelineTotals.new ?? 0),
+        [pipelineTotals],
+    );
+
+    const readyToHandOff = useMemo(
+        () => pipelineTotals.ready ?? 0,
+        [pipelineTotals],
+    );
+
+    const getNextStatus = (current: PipelineStatus) => {
+        if (current === 'processing') return 'in_progress';
+
+        const currentIndex = statusFlow.indexOf(current);
+
+        if (currentIndex === -1 || currentIndex === statusFlow.length - 1) return undefined;
+
+        return statusFlow[currentIndex + 1];
+    };
+
+    const handleAdvanceStatus = (id: number) => {
+        setOrderCards((prev) =>
+            prev.map((order) => {
+                if (order.id !== id) return order;
+
+                const next = getNextStatus(order.status as PipelineStatus);
+
+                if (!next) return order;
+
+                return { ...order, status: next };
+            }),
+        );
+    };
 
     return (
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
 
             <div className="space-y-6">
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-semibold">Дашборд</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Живые данные из заказов, оплат и партий на складе
+                <div className="flex flex-col gap-4 rounded-xl border bg-gradient-to-r from-background via-background/80 to-background/60 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                            <span className="inline-flex h-6 items-center rounded-md bg-primary/10 px-2 text-primary">CRM</span>
+                            Живой борд смены
+                        </div>
+                        <h1 className="text-3xl font-semibold leading-tight">Рабочий день магазина</h1>
+                        <p className="max-w-3xl text-sm text-muted-foreground">
+                            Воронка заказов, оплаты и партии на складе в одном экране. Карточки можно двигать по статусам —
+                            как в привычной CRM.
                         </p>
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <Badge variant="secondary" className="rounded-full">Закрыто сегодня: {completedToday}</Badge>
+                            <Badge variant="outline" className="rounded-full">Пиковая нагрузка: {ordersToday} заказов</Badge>
+                        </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 md:justify-end">
                         <Button asChild variant="outline">
                             <Link href="/orders">Открыть заказы</Link>
                         </Button>
-                        <Button asChild>
+                        <Button asChild variant="secondary">
                             <Link href="/inventory">Склад</Link>
+                        </Button>
+                        <Button asChild>
+                            <Link href="/orders/create">Создать заказ</Link>
                         </Button>
                     </div>
                 </div>
@@ -263,23 +388,112 @@ export default function Dashboard({
                 </section>
 
                 <Card className="border-border/80" id="pipeline">
-                    <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
-                            <CardTitle>Воронка заказов</CardTitle>
-                            <CardDescription>Контроль статусов и скорости прохождения</CardDescription>
+                            <CardTitle>Живой борд заказов</CardTitle>
+                            <CardDescription>Карточки можно переводить по статусам — как в CRM</CardDescription>
                         </div>
-                        <Button asChild variant="outline" size="sm">
-                            <Link href="/orders">Управлять заказами</Link>
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="rounded-full">Активных: {formatNumber(activeInProgress)}</Badge>
+                            <Badge variant="secondary" className="rounded-full">Готовых к выдаче: {formatNumber(readyToHandOff)}</Badge>
+                            <Button asChild variant="ghost" size="sm" className="gap-2">
+                                <Link href="/orders">
+                                    Управлять списком
+                                    <ArrowRight className="h-4 w-4" />
+                                </Link>
+                            </Button>
+                        </div>
                     </CardHeader>
-                    <CardContent className="grid gap-3 md:grid-cols-3">
-                        {pipelineStatuses.map((status) => (
-                            <div key={status} className="rounded-lg border bg-muted/30 px-3 py-2">
-                                <p className="text-sm font-medium">{statusLabels[status] ?? status}</p>
-                                <p className="text-lg font-semibold">{formatNumber(pipelineTotals[status] ?? 0)}</p>
-                                <p className="text-xs text-muted-foreground">Всего заказов со статусом</p>
-                            </div>
-                        ))}
+                    <CardContent className="overflow-x-auto">
+                        <div className="grid min-w-full gap-4 md:grid-cols-2 xl:grid-cols-5">
+                            {boardColumns.map((column) => (
+                                <div key={column.status} className="flex h-full flex-col gap-3 rounded-xl border bg-muted/20 p-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="rounded-full">
+                                                    {statusLabels[column.status] ?? column.status}
+                                                </Badge>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {statusHints[column.status] ?? 'Статус из заказов'}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">{formatNumber(pipelineTotals[column.status] ?? 0)} в колонке</p>
+                                        </div>
+                                        <Badge variant="secondary">{column.orders.length}</Badge>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {column.orders.length === 0 && (
+                                            <p className="text-xs text-muted-foreground">Нет карточек в этом статусе.</p>
+                                        )}
+
+                                        {column.orders.map((order) => {
+                                            const next = getNextStatus(order.status as PipelineStatus);
+                                            const actionLabel = statusActions[order.status] ?? 'Обновить статус';
+
+                                            return (
+                                                <div
+                                                    key={order.id}
+                                                    className="space-y-3 rounded-lg border bg-background p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div>
+                                                            <p className="text-sm font-semibold">#{order.id}</p>
+                                                            <p className="text-xs text-muted-foreground">{order.customer ?? 'Без имени'}</p>
+                                                        </div>
+                                                        <Badge variant="outline">{formatCurrency(order.total)}</Badge>
+                                                    </div>
+
+                                                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                        <span className="inline-flex items-center gap-1 rounded-md bg-secondary/60 px-2 py-1 text-secondary-foreground">
+                                                            <Truck className="h-3 w-3" />
+                                                            {deliveryLabels[order.delivery_type] ?? order.delivery_type}
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1 rounded-md bg-secondary/60 px-2 py-1 text-secondary-foreground">
+                                                            <Timer className="h-3 w-3" />
+                                                            {order.delivery_time ?? new Date(order.created_at).toLocaleTimeString('ru-RU')}
+                                                        </span>
+                                                        <Badge variant={order.payment_status === 'paid' ? 'secondary' : 'outline'}>
+                                                            {order.payment_status === 'paid'
+                                                                ? 'Оплата получена'
+                                                                : `Оплачено ${formatCurrency(order.paid_total)}`}
+                                                        </Badge>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {statusLabels[order.status] ?? order.status}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                variant={next ? 'default' : 'outline'}
+                                                                className="gap-2"
+                                                                disabled={!next}
+                                                                onClick={() => handleAdvanceStatus(order.id)}
+                                                            >
+                                                                <ClipboardList className="h-4 w-4" />
+                                                                {next ? actionLabel : 'Финальный статус'}
+                                                            </Button>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                disabled={!next}
+                                                                onClick={() => handleAdvanceStatus(order.id)}
+                                                                aria-label="Продвинуть заказ"
+                                                            >
+                                                                <ArrowRight className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </CardContent>
                 </Card>
 

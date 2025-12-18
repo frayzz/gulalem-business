@@ -12,10 +12,16 @@ class Customer extends Model
     protected $fillable = [
         'name',
         'phone',
+        'phone_e164',
         'email',
         'birthday',
         'notes',
     ];
+
+    public function getPhoneAttribute($value): ?string
+    {
+        return $this->attributes['phone'] ?? $value;
+    }
 
     public static function normalizePhone(?string $phone): ?string
     {
@@ -43,6 +49,7 @@ class Customer extends Model
     public function setPhoneAttribute(?string $phone): void
     {
         $this->attributes['phone'] = self::normalizePhone($phone);
+        $this->attributes['phone_e164'] = self::normalizePhone($phone);
     }
 
     /**

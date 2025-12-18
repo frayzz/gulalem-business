@@ -9,12 +9,12 @@ class Order extends Model
 {
     use HasFactory;
 
-    public const STATUS_NEW = 'new';
-    public const STATUS_IN_PROGRESS = 'in_progress';
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_CONFIRMED = 'confirmed';
+    public const STATUS_IN_ASSEMBLY = 'in_assembly';
     public const STATUS_READY = 'ready';
     public const STATUS_DELIVERED = 'delivered';
-    public const STATUS_COMPLETED = 'completed';
-    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_CANCELED = 'canceled';
 
     protected $fillable = [
         'customer_id',
@@ -55,5 +55,13 @@ class Order extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<PaymentStatusHistory>
+     */
+    public function paymentStatusHistory()
+    {
+        return $this->hasMany(PaymentStatusHistory::class);
     }
 }

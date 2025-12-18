@@ -39,7 +39,7 @@ class OrderController extends Controller
             $normalizedPhone = Customer::normalizePhone($validated['customer_phone']);
 
             $customer = Customer::query()
-                ->when($normalizedPhone, fn ($query) => $query->where('phone', $normalizedPhone))
+                ->when($normalizedPhone, fn ($query) => $query->where('phone_e164', $normalizedPhone))
                 ->first();
 
             if ($customer) {
@@ -57,14 +57,14 @@ class OrderController extends Controller
 
         Order::create([
             'customer_id' => $customer?->id,
-            'status' => Order::STATUS_NEW,
+            'status' => Order::STATUS_DRAFT,
             'delivery_type' => $validated['delivery_type'],
             'delivery_address' => null,
             'delivery_time' => null,
             'total' => $validated['total'],
             'discount' => 0,
             'paid_total' => 0,
-            'payment_status' => 'pending',
+            'payment_status' => 'unpaid',
             'notes' => $validated['notes'] ?? null,
         ]);
 

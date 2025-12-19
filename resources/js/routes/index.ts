@@ -47,7 +47,7 @@ export const register = createRoute('/register');
 export const logout = createRoute('/logout', 'post');
 export const switchStore = createRoute('/stores/switch', 'post');
 
-const routes = {
+export const routes = {
   home,
   dashboard,
   login,

@@ -10,6 +10,7 @@ class ProductBatch extends Model
     use HasFactory;
 
     protected $fillable = [
+        'shop_id',
         'product_id',
         'supplier_id',
         'buy_price',
@@ -38,5 +39,13 @@ class ProductBatch extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<Store>
+     */
+    public function shop()
+    {
+        return $this->belongsTo(Store::class, 'shop_id');
     }
 }

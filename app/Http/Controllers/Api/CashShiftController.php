@@ -4,13 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CashShift;
+use App\Services\Stores;
 use Illuminate\Http\Request;
 
 class CashShiftController extends Controller
 {
+    public function __construct(private Stores $stores)
+    {
+    }
+
     public function index()
     {
-        return CashShift::with('user')->orderByDesc('opened_at')->paginate(20);
+        return CashShift::with('user')
+            ->where('shop_id', $this->stores->currentId())
+            ->orderByDesc('opened_at')
+            ->paginate(20);
     }
 
     public function store(Request $request)
@@ -21,6 +29,7 @@ class CashShiftController extends Controller
         ]);
 
         $shift = CashShift::create([
+            'shop_id' => $this->stores->currentId(),
             'user_id' => $request->user()->id,
             'opened_at' => $data['opened_at'],
             'cash_start' => $data['cash_start'] ?? 0,
@@ -31,11 +40,15 @@ class CashShiftController extends Controller
 
     public function show(CashShift $cashShift)
     {
+        $this->ensureSameStore($cashShift);
+
         return $cashShift->load('user');
     }
 
     public function update(Request $request, CashShift $cashShift)
     {
+        $this->ensureSameStore($cashShift);
+
         $data = $request->validate([
             'closed_at' => 'nullable|date',
             'cash_end' => 'nullable|numeric',
@@ -44,5 +57,12 @@ class CashShiftController extends Controller
         $cashShift->update($data);
 
         return $cashShift->fresh()->load('user');
+    }
+
+    private function ensureSameStore(CashShift $cashShift): void
+    {
+        $storeId = $this->stores->currentId();
+
+        abort_if($cashShift->shop_id && $cashShift->shop_id !== $storeId, 404);
     }
 }

@@ -5,17 +5,21 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Inventory\InventoryService;
 use App\Http\Controllers\Controller;
 use App\Models\ProductBatch;
+use App\Services\Stores;
 use Illuminate\Http\Request;
 
 class ProductBatchController extends Controller
 {
-    public function __construct(private InventoryService $inventory)
+    public function __construct(private InventoryService $inventory, private Stores $stores)
     {
     }
 
     public function index()
     {
-        return ProductBatch::with(['product', 'supplier'])->orderByDesc('arrived_at')->paginate(20);
+        return ProductBatch::with(['product', 'supplier'])
+            ->where('shop_id', $this->stores->currentId())
+            ->orderByDesc('arrived_at')
+            ->paginate(20);
     }
 
     public function store(Request $request)

@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Services\PaymentService;
+use App\Services\Stores;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,25 +17,30 @@ use Inertia\Response;
 
 class OrderController extends Controller
 {
-    public function __construct(private InventoryService $inventory)
+    public function __construct(private InventoryService $inventory, private Stores $stores)
     {
     }
 
     public function index(): Response
     {
+        $storeId = $this->stores->currentId();
+
         return Inertia::render('orders/index', [
-            'orders' => Order::with(['customer', 'payments'])->latest()->paginate(15),
+            'orders' => Order::with(['customer', 'payments'])
+                ->where('shop_id', $storeId)
+                ->latest()
+                ->paginate(15),
             'products' => Product::with(['bouquetRecipe.items.product'])
                 ->orderBy('name')
                 ->get()
-                ->map(function (Product $product) {
+                ->map(function (Product $product) use ($storeId) {
                     return [
                         'id' => $product->id,
                         'name' => $product->name,
                         'type' => $product->type,
                         'unit' => $product->unit,
                         'default_price' => $product->default_price,
-                        'available_qty' => $this->inventory->getAvailableQty($product),
+                        'available_qty' => $this->inventory->getAvailableQty($product, shopId: $storeId),
                         'bouquet_recipe' => $product->bouquetRecipe ? [
                             'items' => $product->bouquetRecipe->items->map(fn ($item) => [
                                 'id' => $item->id,
@@ -66,14 +72,18 @@ class OrderController extends Controller
             'items.*.discount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        DB::transaction(function () use ($validated) {
+        $storeId = $this->stores->currentId();
+
+        DB::transaction(function () use ($validated, $storeId) {
             $customer = $this->findOrCreateCustomer(
                 $validated['customer_name'] ?? null,
-                $validated['customer_phone'] ?? null
+                $validated['customer_phone'] ?? null,
+                $storeId
             );
 
             /** @var Order $order */
             $order = Order::create([
+                'shop_id' => $storeId,
                 'customer_id' => $customer?->id,
                 'status' => Order::STATUS_DRAFT,
                 'delivery_type' => $validated['delivery_type'],
@@ -111,7 +121,7 @@ class OrderController extends Controller
         return back()->with('success', 'Заказ создан, зарезервирован и добавлен в очередь.');
     }
 
-    private function findOrCreateCustomer(?string $name, ?string $phone): ?Customer
+    private function findOrCreateCustomer(?string $name, ?string $phone, int $storeId): ?Customer
     {
         if (!$name && !$phone) {
             return null;
@@ -120,6 +130,7 @@ class OrderController extends Controller
         $normalizedPhone = Customer::normalizePhone($phone);
 
         $customer = Customer::query()
+            ->where('shop_id', $storeId)
             ->when($normalizedPhone, fn ($query) => $query->where('phone_e164', $normalizedPhone))
             ->first();
 
@@ -133,6 +144,7 @@ class OrderController extends Controller
         }
 
         return Customer::create([
+            'shop_id' => $storeId,
             'name' => $name,
             'phone' => $normalizedPhone,
         ]);

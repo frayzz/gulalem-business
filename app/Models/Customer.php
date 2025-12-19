@@ -11,6 +11,7 @@ class Customer extends Model
     use HasFactory;
 
     protected $fillable = [
+        'shop_id',
         'name',
         'phone',
         'phone_e164',
@@ -22,6 +23,14 @@ class Customer extends Model
     public function getPhoneAttribute($value): ?string
     {
         return $this->attributes['phone'] ?? $value;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<Store>
+     */
+    public function shop()
+    {
+        return $this->belongsTo(Store::class, 'shop_id');
     }
 
     public static function normalizePhone(?string $phone): ?string

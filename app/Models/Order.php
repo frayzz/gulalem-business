@@ -26,6 +26,7 @@ class Order extends Model
     ];
 
     protected $fillable = [
+        'shop_id',
         'customer_id',
         'status',
         'delivery_type',
@@ -72,5 +73,13 @@ class Order extends Model
     public function paymentStatusHistory()
     {
         return $this->hasMany(PaymentStatusHistory::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<Store>
+     */
+    public function shop()
+    {
+        return $this->belongsTo(Store::class, 'shop_id');
     }
 }

@@ -10,6 +10,7 @@ class InventoryReservation extends Model
     use HasFactory;
 
     protected $fillable = [
+        'shop_id',
         'product_id',
         'order_id',
         'qty',
@@ -29,5 +30,13 @@ class InventoryReservation extends Model
     public function order()
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<Store>
+     */
+    public function shop()
+    {
+        return $this->belongsTo(Store::class, 'shop_id');
     }
 }

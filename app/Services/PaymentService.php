@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\PaymentStatusHistory;
+use App\Services\Stores;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
@@ -19,8 +20,20 @@ class PaymentService
     public function registerPayment(array $data): Payment
     {
         return DB::transaction(function () use ($data) {
+            $order = null;
+
+            if (!empty($data['order_id'])) {
+                $order = Order::find($data['order_id']);
+            }
+
+            $data['shop_id'] = $data['shop_id']
+                ?? $order?->shop_id
+                ?? app(Stores::class)->currentId();
+
             /** @var Payment $payment */
             $payment = Payment::create($data);
+
+            $order ??= $payment->order;
 
             if ($payment->order) {
                 $this->refreshStatus($payment->order);

@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Services\PaymentService;
+use App\Services\Stores;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -16,15 +17,18 @@ use Symfony\Component\HttpFoundation\Response;
 
 class OrderController extends Controller
 {
-    public function __construct(private InventoryService $inventory, private PaymentService $paymentService)
+    public function __construct(private InventoryService $inventory, private PaymentService $paymentService, private Stores $stores)
     {
     }
 
     public function index(Request $request)
     {
         $status = $request->query('status');
+        $storeId = $this->stores->currentId();
 
-        $query = Order::with(['customer', 'items.product', 'payments'])->orderByDesc('created_at');
+        $query = Order::with(['customer', 'items.product', 'payments'])
+            ->where('shop_id', $storeId)
+            ->orderByDesc('created_at');
 
         if ($status) {
             $query->where('status', $status);
@@ -53,8 +57,17 @@ class OrderController extends Controller
             'payments.*.amount' => 'required_with:payments|numeric',
         ]);
 
-        $order = DB::transaction(function () use ($data) {
+        $storeId = $this->stores->currentId();
+        $order = DB::transaction(function () use ($data, $storeId) {
+            if (!empty($data['customer_id'])) {
+                abort_unless(
+                    Customer::where('id', $data['customer_id'])->where('shop_id', $storeId)->exists(),
+                    Response::HTTP_NOT_FOUND
+                );
+            }
+
             $order = Order::create([
+                'shop_id' => $storeId,
                 'customer_id' => $data['customer_id'] ?? null,
                 'status' => $data['status'] ?? Order::STATUS_DRAFT,
                 'delivery_type' => $data['delivery_type'],
@@ -99,11 +112,15 @@ class OrderController extends Controller
 
     public function show(Order $order)
     {
+        $this->ensureSameStore($order);
+
         return $order->load(['items.product', 'payments', 'customer']);
     }
 
     public function updateStatus(Request $request, Order $order)
     {
+        $this->ensureSameStore($order);
+
         $data = $request->validate([
             'status' => ['required', Rule::in(Order::STATUSES)],
         ]);
@@ -125,6 +142,8 @@ class OrderController extends Controller
 
     public function pay(Request $request, Order $order)
     {
+        $this->ensureSameStore($order);
+
         $data = $request->validate([
             'payments' => 'required|array|min:1',
             'payments.*.method' => 'required|string',
@@ -177,5 +196,12 @@ class OrderController extends Controller
         if (in_array($newStatus, $consumableStatuses, true) && !in_array($oldStatus, $consumableStatuses, true)) {
             $this->inventory->consumeForOrder($order);
         }
+    }
+
+    private function ensureSameStore(Order $order): void
+    {
+        $storeId = $this->stores->currentId();
+
+        abort_if($order->shop_id && $order->shop_id !== $storeId, Response::HTTP_NOT_FOUND);
     }
 }

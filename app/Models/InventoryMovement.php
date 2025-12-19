@@ -16,6 +16,7 @@ class InventoryMovement extends Model
     public const TYPE_RELEASE = 'release';
 
     protected $fillable = [
+        'shop_id',
         'product_id',
         'batch_id',
         'type',
@@ -47,5 +48,13 @@ class InventoryMovement extends Model
     public function order()
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<Store>
+     */
+    public function shop()
+    {
+        return $this->belongsTo(Store::class, 'shop_id');
     }
 }

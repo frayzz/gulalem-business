@@ -4,16 +4,22 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Services\Stores;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class CustomerController extends Controller
 {
+    public function __construct(private Stores $stores)
+    {
+    }
+
     public function index(Request $request)
     {
         $search = $request->query('search');
+        $storeId = $this->stores->currentId();
 
-        $query = Customer::query();
+        $query = Customer::query()->where('shop_id', $storeId);
 
         if ($search) {
             $normalizedSearch = Customer::normalizePhone($search);
@@ -40,6 +46,7 @@ class CustomerController extends Controller
             'birthday' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
+        $data['shop_id'] = $this->stores->currentId();
 
         $customer = Customer::create($data);
 
@@ -48,6 +55,8 @@ class CustomerController extends Controller
 
     public function show(Customer $customer)
     {
+        $this->ensureSameStore($customer);
+
         return $customer->load('orders');
     }
 
@@ -64,6 +73,7 @@ class CustomerController extends Controller
         }
 
         $customer = Customer::query()
+            ->where('shop_id', $this->stores->currentId())
             ->where('phone_e164', $normalizedPhone)
             ->with(['orders' => function ($query) {
                 $query->latest()->take(5);
@@ -79,6 +89,8 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer)
     {
+        $this->ensureSameStore($customer);
+
         $data = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'phone' => 'nullable|string|max:50',
@@ -90,5 +102,12 @@ class CustomerController extends Controller
         $customer->update($data);
 
         return $customer->fresh();
+    }
+
+    private function ensureSameStore(Customer $customer): void
+    {
+        $storeId = $this->stores->currentId();
+
+        abort_if($customer->shop_id && $customer->shop_id !== $storeId, 404);
     }
 }

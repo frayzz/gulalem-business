@@ -7,6 +7,7 @@ use App\Models\BouquetRecipe;
 use App\Models\BouquetRecipeItem;
 use App\Models\Product;
 use App\Models\ProductBatch;
+use App\Services\Stores;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,14 +15,19 @@ use Inertia\Response;
 
 class InventoryController extends Controller
 {
-    public function __construct(private InventoryService $inventory)
+    public function __construct(private InventoryService $inventory, private Stores $stores)
     {
     }
 
     public function index(): Response
     {
+        $storeId = $this->stores->currentId();
+
         return Inertia::render('inventory/index', [
-            'batches' => ProductBatch::with('product')->latest('arrived_at')->paginate(15),
+            'batches' => ProductBatch::with('product')
+                ->where('shop_id', $storeId)
+                ->latest('arrived_at')
+                ->paginate(15),
             'recipes' => BouquetRecipe::with(['bouquet', 'items.product'])
                 ->latest()
                 ->get()
@@ -41,7 +47,7 @@ class InventoryController extends Controller
                     'id' => $product->id,
                     'name' => $product->name,
                     'unit' => $product->unit,
-                    'available_qty' => $this->inventory->getAvailableQty($product),
+                    'available_qty' => $this->inventory->getAvailableQty($product, shopId: $storeId),
                 ]),
         ]);
     }
@@ -73,6 +79,7 @@ class InventoryController extends Controller
         }
 
         ProductBatch::create([
+            'shop_id' => $this->stores->currentId(),
             'product_id' => $product->id,
             'supplier_id' => null,
             'buy_price' => $validated['buy_price'],

@@ -10,6 +10,7 @@ class Payment extends Model
     use HasFactory;
 
     protected $fillable = [
+        'shop_id',
         'order_id',
         'method',
         'amount',
@@ -21,5 +22,13 @@ class Payment extends Model
     public function order()
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<Store>
+     */
+    public function shop()
+    {
+        return $this->belongsTo(Store::class, 'shop_id');
     }
 }

@@ -10,6 +10,7 @@ class CashShift extends Model
     use HasFactory;
 
     protected $fillable = [
+        'shop_id',
         'user_id',
         'opened_at',
         'closed_at',
@@ -28,5 +29,13 @@ class CashShift extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<Store>
+     */
+    public function shop()
+    {
+        return $this->belongsTo(Store::class, 'shop_id');
     }
 }

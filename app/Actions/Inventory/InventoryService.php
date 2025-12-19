@@ -8,6 +8,7 @@ use App\Models\InventoryReservation;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductBatch;
+use App\Services\Stores;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -15,11 +16,18 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryService
 {
+    public function __construct(private Stores $stores)
+    {
+    }
+
     public function intake(array $data): ProductBatch
     {
         return DB::transaction(function () use ($data) {
+            $shopId = $this->resolveStoreId();
+
             /** @var ProductBatch $batch */
             $batch = ProductBatch::create([
+                'shop_id' => $shopId,
                 'product_id' => $data['product_id'],
                 'supplier_id' => $data['supplier_id'] ?? null,
                 'buy_price' => $data['buy_price'],
@@ -30,6 +38,7 @@ class InventoryService
             ]);
 
             InventoryMovement::create([
+                'shop_id' => $shopId,
                 'product_id' => $batch->product_id,
                 'batch_id' => $batch->id,
                 'type' => InventoryMovement::TYPE_IN,
@@ -44,7 +53,10 @@ class InventoryService
 
     public function adjust(Product $product, float $qty, ?int $batchId = null, ?string $reason = null, ?int $userId = null): InventoryMovement
     {
+        $shopId = $this->resolveStoreId();
+
         return InventoryMovement::create([
+            'shop_id' => $shopId,
             'product_id' => $product->id,
             'batch_id' => $batchId,
             'type' => InventoryMovement::TYPE_ADJUST,
@@ -54,12 +66,14 @@ class InventoryService
         ]);
     }
 
-    public function writeOff(Product $product, float $qty, ?int $orderId = null, ?string $reason = null, ?int $userId = null): void
+    public function writeOff(Product $product, float $qty, ?int $orderId = null, ?string $reason = null, ?int $userId = null, ?int $shopId = null): void
     {
-        DB::transaction(function () use ($product, $qty, $orderId, $reason, $userId) {
+        DB::transaction(function () use ($product, $qty, $orderId, $reason, $userId, $shopId) {
+            $storeId = $this->resolveStoreId(orderId: $orderId, shopId: $shopId);
             $remaining = $qty;
 
             $batches = ProductBatch::where('product_id', $product->id)
+                ->where('shop_id', $storeId)
                 ->where('qty_left', '>', 0)
                 ->orderBy('arrived_at')
                 ->lockForUpdate()
@@ -74,6 +88,7 @@ class InventoryService
                 $batch->decrement('qty_left', $consume);
 
                 InventoryMovement::create([
+                    'shop_id' => $storeId,
                     'product_id' => $product->id,
                     'batch_id' => $batch->id,
                     'type' => InventoryMovement::TYPE_OUT,
@@ -94,6 +109,7 @@ class InventoryService
                 ]);
 
                 InventoryMovement::create([
+                    'shop_id' => $storeId,
                     'product_id' => $product->id,
                     'batch_id' => null,
                     'type' => InventoryMovement::TYPE_OUT,
@@ -109,6 +125,7 @@ class InventoryService
     public function consumeForOrder(Order $order): void
     {
         DB::transaction(function () use ($order) {
+            $shopId = $this->resolveStoreId($order);
             $order->loadMissing('items.product.bouquetRecipe.items');
 
             foreach ($order->items as $item) {
@@ -119,17 +136,19 @@ class InventoryService
                         throw new RuntimeException("Bouquet {$product->id} is missing a recipe");
                     }
 
-                    $this->consumeBouquet($product->bouquetRecipe->items, $item->qty, $order->id);
+                    $this->consumeBouquet($product->bouquetRecipe->items, $item->qty, $order->id, $shopId);
 
                     foreach ($product->bouquetRecipe->items as $recipeItem) {
                         InventoryReservation::where('order_id', $order->id)
+                            ->where('shop_id', $shopId)
                             ->where('product_id', $recipeItem->product_id)
                             ->delete();
                     }
                 } else {
-                    $this->writeOff($product, $item->qty, $order->id, 'order-fulfillment');
+                    $this->writeOff($product, $item->qty, $order->id, 'order-fulfillment', shopId: $shopId);
 
                     InventoryReservation::where('order_id', $order->id)
+                        ->where('shop_id', $shopId)
                         ->where('product_id', $product->id)
                         ->delete();
                 }
@@ -163,7 +182,7 @@ class InventoryService
 
         foreach ($requirements as $productId => $requiredQty) {
             $product = Product::findOrFail($productId);
-            $available = $this->getAvailableQty($product, $order->id);
+            $available = $this->getAvailableQty($product, $order->id, $order->shop_id);
 
             if ($available < $requiredQty) {
                 throw ValidationException::withMessages([
@@ -176,17 +195,18 @@ class InventoryService
     /**
      * @param \Illuminate\Support\Collection<int, BouquetRecipeItem> $recipeItems
      */
-    protected function consumeBouquet($recipeItems, float $orderQty, int $orderId): void
+    protected function consumeBouquet($recipeItems, float $orderQty, int $orderId, int $shopId): void
     {
         foreach ($recipeItems as $item) {
             $requiredQty = $orderQty * $item->qty;
-            $this->writeOff($item->product, $requiredQty, $orderId, 'bouquet-component');
+            $this->writeOff($item->product, $requiredQty, $orderId, 'bouquet-component', shopId: $shopId);
         }
     }
 
     public function reserveForOrder(Order $order): void
     {
         DB::transaction(function () use ($order) {
+            $shopId = $this->resolveStoreId($order);
             $order->loadMissing('items.product.bouquetRecipe.items');
 
             foreach ($order->items as $item) {
@@ -201,11 +221,12 @@ class InventoryService
                         $requiredQty = $item->qty * $recipeItem->qty;
 
                         InventoryReservation::updateOrCreate(
-                            ['order_id' => $order->id, 'product_id' => $recipeItem->product_id],
+                            ['order_id' => $order->id, 'product_id' => $recipeItem->product_id, 'shop_id' => $shopId],
                             ['qty' => $requiredQty]
                         );
 
                         InventoryMovement::create([
+                            'shop_id' => $shopId,
                             'product_id' => $recipeItem->product_id,
                             'batch_id' => null,
                             'type' => InventoryMovement::TYPE_RESERVE,
@@ -219,11 +240,12 @@ class InventoryService
                 }
 
                 InventoryReservation::updateOrCreate(
-                    ['order_id' => $order->id, 'product_id' => $product->id],
+                    ['order_id' => $order->id, 'product_id' => $product->id, 'shop_id' => $shopId],
                     ['qty' => $item->qty]
                 );
 
                 InventoryMovement::create([
+                    'shop_id' => $shopId,
                     'product_id' => $product->id,
                     'batch_id' => null,
                     'type' => InventoryMovement::TYPE_RESERVE,
@@ -238,10 +260,14 @@ class InventoryService
     public function releaseReservation(Order $order): void
     {
         DB::transaction(function () use ($order) {
-            $reservations = InventoryReservation::where('order_id', $order->id)->get();
+            $shopId = $this->resolveStoreId($order);
+            $reservations = InventoryReservation::where('order_id', $order->id)
+                ->where('shop_id', $shopId)
+                ->get();
 
             foreach ($reservations as $reservation) {
                 InventoryMovement::create([
+                    'shop_id' => $shopId,
                     'product_id' => $reservation->product_id,
                     'batch_id' => null,
                     'type' => InventoryMovement::TYPE_RELEASE,
@@ -251,7 +277,7 @@ class InventoryService
                 ]);
             }
 
-            InventoryReservation::where('order_id', $order->id)->delete();
+            InventoryReservation::where('order_id', $order->id)->where('shop_id', $shopId)->delete();
         });
     }
 
@@ -270,11 +296,15 @@ class InventoryService
         return $total;
     }
 
-    public function getAvailableQty(Product $product, ?int $orderId = null): float
+    public function getAvailableQty(Product $product, ?int $orderId = null, ?int $shopId = null): float
     {
-        $stock = ProductBatch::where('product_id', $product->id)->sum('qty_left');
+        $storeId = $this->resolveStoreId(orderId: $orderId, shopId: $shopId);
+        $stock = ProductBatch::where('product_id', $product->id)
+            ->where('shop_id', $storeId)
+            ->sum('qty_left');
 
-        $reservedQuery = InventoryReservation::where('product_id', $product->id);
+        $reservedQuery = InventoryReservation::where('product_id', $product->id)
+            ->where('shop_id', $storeId);
 
         if ($orderId !== null) {
             $reservedQuery->where('order_id', '!=', $orderId);
@@ -283,5 +313,26 @@ class InventoryService
         $reserved = $reservedQuery->sum('qty');
 
         return max(0, $stock - $reserved);
+    }
+
+    private function resolveStoreId(?Order $order = null, ?int $orderId = null, ?int $shopId = null): int
+    {
+        if ($shopId !== null) {
+            return $shopId;
+        }
+
+        if ($order?->shop_id) {
+            return $order->shop_id;
+        }
+
+        if ($orderId) {
+            $resolved = Order::whereKey($orderId)->value('shop_id');
+
+            if ($resolved) {
+                return (int) $resolved;
+            }
+        }
+
+        return $this->stores->currentId();
     }
 }

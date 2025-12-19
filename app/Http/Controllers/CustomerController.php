@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Services\Stores;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -10,10 +11,17 @@ use Inertia\Response;
 
 class CustomerController extends Controller
 {
+    public function __construct(private Stores $stores)
+    {
+    }
+
     public function index(): Response
     {
         return Inertia::render('customers/index', [
-            'customers' => Customer::withCount('orders')->latest()->paginate(15),
+            'customers' => Customer::withCount('orders')
+                ->where('shop_id', $this->stores->currentId())
+                ->latest()
+                ->paginate(15),
         ]);
     }
 
@@ -28,8 +36,10 @@ class CustomerController extends Controller
         ]);
 
         $normalizedPhone = Customer::normalizePhone($validated['phone'] ?? null);
+        $storeId = $this->stores->currentId();
 
         $customer = Customer::query()
+            ->where('shop_id', $storeId)
             ->when($normalizedPhone, fn ($query) => $query->where('phone', $normalizedPhone))
             ->first();
 
@@ -43,6 +53,7 @@ class CustomerController extends Controller
             ])->save();
         } else {
             Customer::create([
+                'shop_id' => $storeId,
                 ...$validated,
                 'phone' => $normalizedPhone,
             ]);

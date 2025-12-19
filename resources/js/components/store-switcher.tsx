@@ -29,11 +29,12 @@ export function StoreSwitcher() {
 
     const handleSwitch = (storeId: number) => {
         if (storeId === currentStore.id) return;
-
+    
         setPendingStoreId(storeId);
-
+    
         router.post(
-            router.post(switchStore.url(), { store_id: storeId },
+            switchStore.url(),
+            { store_id: storeId },
             {
                 preserveScroll: true,
                 onSuccess: () =>

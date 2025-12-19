@@ -6,12 +6,14 @@ use App\Models\BouquetRecipe;
 use App\Models\CashShift;
 use App\Models\Customer;
 use App\Models\InventoryMovement;
+use App\Models\InventoryReservation;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductBatch;
 use App\Models\Role;
 use App\Models\Store;
+use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
@@ -26,11 +28,13 @@ class UserDemoSeeder extends Seeder
         DB::transaction(function (): void {
             $user = $this->seedOwner();
             $store = $this->seedStore($user);
+            $suppliers = $this->seedSuppliers();
             $products = $this->seedProducts();
-            $batches = $this->seedProductBatches($products);
+            $batches = $this->seedProductBatches($products, $suppliers);
             $this->seedBouquetRecipe($products);
             $customers = $this->seedCustomers();
-            $this->seedOrders($customers, $products, $user);
+            $orders = $this->seedOrders($customers, $products, $user);
+            $this->seedInventoryReservations($orders, $products);
             $this->seedInventoryMovements($products, $batches, $user);
             $this->seedCashShift($user);
         });
@@ -120,16 +124,45 @@ class UserDemoSeeder extends Seeder
     }
 
     /**
+     * @return array<string, Supplier>
+     */
+    private function seedSuppliers(): array
+    {
+        $suppliers = [
+            'flowerFarm' => [
+                'name' => 'Sever Flor',
+                'contact' => 'Алексей',
+                'phone' => '+7 921 333-22-11',
+                'notes' => 'Основной поставщик роз и эустомы.',
+            ],
+            'packaging' => [
+                'name' => 'Упаковка+ Питер',
+                'contact' => 'Марина',
+                'phone' => '+7 911 555-44-33',
+                'notes' => 'Крафт и ленты, быстрые поставки.',
+            ],
+        ];
+
+        return collect($suppliers)
+            ->mapWithKeys(fn (array $data, string $key) => [
+                $key => Supplier::updateOrCreate(['name' => $data['name']], $data),
+            ])
+            ->all();
+    }
+
+    /**
      * @param  array<string, Product>  $products
+     * @param  array<string, Supplier>  $suppliers
      * @return array<string, ProductBatch>
      */
-    private function seedProductBatches(array $products): array
+    private function seedProductBatches(array $products, array $suppliers): array
     {
         $today = now();
 
         $batches = [
             'roses' => [
                 'product_id' => $products['roses']->id,
+                'supplier_id' => $suppliers['flowerFarm']->id ?? null,
                 'buy_price' => 110,
                 'qty_in' => 50,
                 'qty_left' => 48,
@@ -138,6 +171,7 @@ class UserDemoSeeder extends Seeder
             ],
             'eustoma' => [
                 'product_id' => $products['eustoma']->id,
+                'supplier_id' => $suppliers['flowerFarm']->id ?? null,
                 'buy_price' => 80,
                 'qty_in' => 30,
                 'qty_left' => 28,
@@ -146,6 +180,7 @@ class UserDemoSeeder extends Seeder
             ],
             'wrapping' => [
                 'product_id' => $products['wrapping']->id,
+                'supplier_id' => $suppliers['packaging']->id ?? null,
                 'buy_price' => 10,
                 'qty_in' => 100,
                 'qty_left' => 95,
@@ -220,8 +255,9 @@ class UserDemoSeeder extends Seeder
     /**
      * @param  array<string, Customer>  $customers
      * @param  array<string, Product>  $products
+     * @return array<string, Order>
      */
-    private function seedOrders(array $customers, array $products, User $user): void
+    private function seedOrders(array $customers, array $products, User $user): array
     {
         $firstOrder = Order::updateOrCreate(
             ['id' => 1],
@@ -302,6 +338,38 @@ class UserDemoSeeder extends Seeder
 
         $secondOrder->payments()->delete();
         $secondOrder->paymentStatusHistory()->delete();
+
+        return [
+            'first' => $firstOrder,
+            'second' => $secondOrder,
+        ];
+    }
+
+    /**
+     * @param  array<string, Order>  $orders
+     * @param  array<string, Product>  $products
+     */
+    private function seedInventoryReservations(array $orders, array $products): void
+    {
+        $reservations = [
+            [
+                'order_id' => $orders['first']->id,
+                'product_id' => $products['roses']->id,
+                'qty' => 3,
+            ],
+            [
+                'order_id' => $orders['second']->id,
+                'product_id' => $products['eustoma']->id,
+                'qty' => 4,
+            ],
+        ];
+
+        foreach ($reservations as $reservation) {
+            InventoryReservation::updateOrCreate(
+                Arr::only($reservation, ['order_id', 'product_id']),
+                $reservation,
+            );
+        }
     }
 
     /**

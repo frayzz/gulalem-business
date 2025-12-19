@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import routes from '@/routes';
+import { routes } from '@/routes';
 import { type SharedData, type Store } from '@/types';
 import { router, usePage } from '@inertiajs/react';
 import { Building2, Check, Loader2 } from 'lucide-react';

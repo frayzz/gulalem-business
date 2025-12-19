@@ -27,16 +27,16 @@ class UserDemoSeeder extends Seeder
     {
         DB::transaction(function (): void {
             $user = $this->seedOwner();
-            $store = $this->seedStore($user);
+            $stores = $this->seedStores($user);
             $suppliers = $this->seedSuppliers();
             $products = $this->seedProducts();
-            $batches = $this->seedProductBatches($products, $suppliers);
+            $batches = $this->seedProductBatches($products, $suppliers, $stores);
             $this->seedBouquetRecipe($products);
-            $customers = $this->seedCustomers();
-            $orders = $this->seedOrders($customers, $products, $user);
-            $this->seedInventoryReservations($orders, $products);
-            $this->seedInventoryMovements($products, $batches, $user);
-            $this->seedCashShift($user);
+            $customers = $this->seedCustomers($stores);
+            $orders = $this->seedOrders($customers, $products, $user, $stores);
+            $this->seedInventoryReservations($orders, $products, $stores);
+            $this->seedInventoryMovements($products, $batches, $user, $stores);
+            $this->seedCashShifts($user, $stores);
         });
     }
 
@@ -61,19 +61,32 @@ class UserDemoSeeder extends Seeder
         return $user;
     }
 
-    private function seedStore(User $user): Store
+    /**
+     * @return array<string, Store>
+     */
+    private function seedStores(User $user): array
     {
-        $store = Store::updateOrCreate(
-            ['name' => 'Главный магазин'],
-            [
+        $stores = [
+            'main' => [
+                'name' => 'Главный магазин',
                 'city' => 'Санкт-Петербург',
                 'status' => 'active',
             ],
-        );
+            'branch' => [
+                'name' => 'Филиал на Невском',
+                'city' => 'Санкт-Петербург',
+                'status' => 'active',
+            ],
+        ];
 
-        $store->users()->syncWithoutDetaching([$user->id]);
+        return collect($stores)
+            ->mapWithKeys(function (array $data, string $key) use ($user) {
+                $store = Store::updateOrCreate(['name' => $data['name']], $data);
+                $store->users()->syncWithoutDetaching([$user->id]);
 
-        return $store;
+                return [$key => $store];
+            })
+            ->all();
     }
 
     /**
@@ -153,14 +166,16 @@ class UserDemoSeeder extends Seeder
     /**
      * @param  array<string, Product>  $products
      * @param  array<string, Supplier>  $suppliers
+     * @param  array<string, Store>  $stores
      * @return array<string, ProductBatch>
      */
-    private function seedProductBatches(array $products, array $suppliers): array
+    private function seedProductBatches(array $products, array $suppliers, array $stores): array
     {
         $today = now();
 
         $batches = [
             'roses' => [
+                'shop_id' => $stores['main']->id,
                 'product_id' => $products['roses']->id,
                 'supplier_id' => $suppliers['flowerFarm']->id ?? null,
                 'buy_price' => 110,
@@ -170,6 +185,7 @@ class UserDemoSeeder extends Seeder
                 'expires_at' => $today->copy()->addDays(5)->toDateString(),
             ],
             'eustoma' => [
+                'shop_id' => $stores['branch']->id,
                 'product_id' => $products['eustoma']->id,
                 'supplier_id' => $suppliers['flowerFarm']->id ?? null,
                 'buy_price' => 80,
@@ -179,6 +195,7 @@ class UserDemoSeeder extends Seeder
                 'expires_at' => $today->copy()->addDays(6)->toDateString(),
             ],
             'wrapping' => [
+                'shop_id' => $stores['main']->id,
                 'product_id' => $products['wrapping']->id,
                 'supplier_id' => $suppliers['packaging']->id ?? null,
                 'buy_price' => 10,
@@ -192,7 +209,7 @@ class UserDemoSeeder extends Seeder
         return collect($batches)
             ->mapWithKeys(fn (array $data, string $key) => [
                 $key => ProductBatch::updateOrCreate(
-                    Arr::only($data, ['product_id', 'arrived_at']),
+                    Arr::only($data, ['product_id', 'arrived_at', 'shop_id']),
                     $data,
                 ),
             ])
@@ -224,12 +241,14 @@ class UserDemoSeeder extends Seeder
     }
 
     /**
+     * @param  array<string, Store>  $stores
      * @return array<string, Customer>
      */
-    private function seedCustomers(): array
+    private function seedCustomers(array $stores): array
     {
         $customers = [
             'anna' => [
+                'shop_id' => $stores['main']->id,
                 'name' => 'Анна Смирнова',
                 'phone' => '+7 (921) 000-11-22',
                 'email' => 'anna@example.com',
@@ -237,6 +256,7 @@ class UserDemoSeeder extends Seeder
                 'notes' => 'Предпочитает красные букеты.',
             ],
             'ivan' => [
+                'shop_id' => $stores['branch']->id,
                 'name' => 'Иван Петров',
                 'phone' => '+7 999 444-55-66',
                 'email' => 'ivan@example.com',
@@ -255,13 +275,15 @@ class UserDemoSeeder extends Seeder
     /**
      * @param  array<string, Customer>  $customers
      * @param  array<string, Product>  $products
+     * @param  array<string, Store>  $stores
      * @return array<string, Order>
      */
-    private function seedOrders(array $customers, array $products, User $user): array
+    private function seedOrders(array $customers, array $products, User $user, array $stores): array
     {
         $firstOrder = Order::updateOrCreate(
             ['id' => 1],
             [
+                'shop_id' => $stores['main']->id,
                 'customer_id' => $customers['anna']->id,
                 'status' => Order::STATUS_DELIVERED,
                 'delivery_type' => 'delivery',
@@ -294,10 +316,12 @@ class UserDemoSeeder extends Seeder
         $firstOrder->payments()->delete();
         $firstOrder->payments()->createMany([
             [
+                'shop_id' => $stores['main']->id,
                 'method' => 'card',
                 'amount' => 1500,
             ],
             [
+                'shop_id' => $stores['main']->id,
                 'method' => 'cash',
                 'amount' => 650,
             ],
@@ -315,6 +339,7 @@ class UserDemoSeeder extends Seeder
         $secondOrder = Order::updateOrCreate(
             ['id' => 2],
             [
+                'shop_id' => $stores['branch']->id,
                 'customer_id' => $customers['ivan']->id,
                 'status' => Order::STATUS_CONFIRMED,
                 'delivery_type' => 'pickup',
@@ -348,16 +373,19 @@ class UserDemoSeeder extends Seeder
     /**
      * @param  array<string, Order>  $orders
      * @param  array<string, Product>  $products
+     * @param  array<string, Store>  $stores
      */
-    private function seedInventoryReservations(array $orders, array $products): void
+    private function seedInventoryReservations(array $orders, array $products, array $stores): void
     {
         $reservations = [
             [
+                'shop_id' => $stores['main']->id,
                 'order_id' => $orders['first']->id,
                 'product_id' => $products['roses']->id,
                 'qty' => 3,
             ],
             [
+                'shop_id' => $stores['branch']->id,
                 'order_id' => $orders['second']->id,
                 'product_id' => $products['eustoma']->id,
                 'qty' => 4,
@@ -366,7 +394,7 @@ class UserDemoSeeder extends Seeder
 
         foreach ($reservations as $reservation) {
             InventoryReservation::updateOrCreate(
-                Arr::only($reservation, ['order_id', 'product_id']),
+                Arr::only($reservation, ['order_id', 'product_id', 'shop_id']),
                 $reservation,
             );
         }
@@ -375,11 +403,13 @@ class UserDemoSeeder extends Seeder
     /**
      * @param  array<string, Product>  $products
      * @param  array<string, ProductBatch>  $batches
+     * @param  array<string, Store>  $stores
      */
-    private function seedInventoryMovements(array $products, array $batches, User $user): void
+    private function seedInventoryMovements(array $products, array $batches, User $user, array $stores): void
     {
         $movements = [
             [
+                'shop_id' => $stores['main']->id,
                 'product_id' => $products['roses']->id,
                 'batch_id' => $batches['roses']->id,
                 'type' => InventoryMovement::TYPE_IN,
@@ -388,6 +418,7 @@ class UserDemoSeeder extends Seeder
                 'user_id' => $user->id,
             ],
             [
+                'shop_id' => $stores['branch']->id,
                 'product_id' => $products['eustoma']->id,
                 'batch_id' => $batches['eustoma']->id,
                 'type' => InventoryMovement::TYPE_IN,
@@ -396,6 +427,7 @@ class UserDemoSeeder extends Seeder
                 'user_id' => $user->id,
             ],
             [
+                'shop_id' => $stores['main']->id,
                 'product_id' => $products['wrapping']->id,
                 'batch_id' => $batches['wrapping']->id,
                 'type' => InventoryMovement::TYPE_IN,
@@ -404,6 +436,7 @@ class UserDemoSeeder extends Seeder
                 'user_id' => $user->id,
             ],
             [
+                'shop_id' => $stores['main']->id,
                 'product_id' => $products['roses']->id,
                 'batch_id' => $batches['roses']->id,
                 'type' => InventoryMovement::TYPE_OUT,
@@ -416,23 +449,28 @@ class UserDemoSeeder extends Seeder
 
         foreach ($movements as $movement) {
             InventoryMovement::updateOrCreate(
-                Arr::only($movement, ['product_id', 'type', 'reason']),
+                Arr::only($movement, ['product_id', 'type', 'reason', 'shop_id']),
                 $movement,
             );
         }
     }
 
-    private function seedCashShift(User $user): void
+    /**
+     * @param  array<string, Store>  $stores
+     */
+    private function seedCashShifts(User $user, array $stores): void
     {
         $openedAt = Carbon::now()->subDay()->setTime(10, 0);
 
-        CashShift::updateOrCreate(
-            ['user_id' => $user->id, 'opened_at' => $openedAt],
-            [
-                'closed_at' => $openedAt->copy()->addHours(10),
-                'cash_start' => 5000,
-                'cash_end' => 7650,
-            ],
-        );
+        foreach ($stores as $store) {
+            CashShift::updateOrCreate(
+                ['user_id' => $user->id, 'shop_id' => $store->id, 'opened_at' => $openedAt],
+                [
+                    'closed_at' => $openedAt->copy()->addHours(10),
+                    'cash_start' => 5000,
+                    'cash_end' => 7650,
+                ],
+            );
+        }
     }
 }

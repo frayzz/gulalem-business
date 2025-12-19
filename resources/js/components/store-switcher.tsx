@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { switchStore } from '@/routes';
+import { switch as switchStore } from '@/routes/stores';
 import { type SharedData, type Store } from '@/types';
 import { router, usePage } from '@inertiajs/react';
 import { Building2, Check, Loader2 } from 'lucide-react';
@@ -33,8 +33,8 @@ export function StoreSwitcher() {
         setPendingStoreId(storeId);
     
         router.post(
-            switchStore.url(),
-            { store_id: storeId },
+          switchStore.url(),
+          { store_id: storeId },
             {
                 preserveScroll: true,
                 onSuccess: () =>

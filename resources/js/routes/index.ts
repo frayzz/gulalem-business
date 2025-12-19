@@ -3,50 +3,41 @@ export type QueryParams = Record<string, string | number | boolean | null | unde
 type FormMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
 type FormConfig = {
-    action: string;
-    method?: FormMethod;
-    query?: QueryParams;
+  action: string;
+  method?: FormMethod;
+  query?: QueryParams;
 };
 
 type RouteHelper = ((params?: QueryParams) => string) & {
-    url: string;
-    form: (options?: Partial<FormConfig>) => FormConfig;
+  url: string;
+  form: (options?: Partial<FormConfig>) => FormConfig;
 };
 
 export function queryParams(params?: QueryParams): string {
-    if (!params) {
-        return '';
-    }
+  if (!params) return '';
 
-    const search = new URLSearchParams();
+  const search = new URLSearchParams();
 
-    Object.entries(params).forEach(([key, value]) => {
-        if (value === undefined || value === null) {
-            return;
-        }
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    search.append(key, String(value));
+  });
 
-        search.append(key, String(value));
-    });
-
-    const queryString = search.toString();
-
-    return queryString ? `?${queryString}` : '';
+  const qs = search.toString();
+  return qs ? `?${qs}` : '';
 }
 
-export function createRoute(
-    path: string,
-    method: FormMethod = 'get',
-): RouteHelper {
-    const route = (params?: QueryParams) => `${path}${queryParams(params)}`;
+export function createRoute(path: string, method: FormMethod = 'get'): RouteHelper {
+  const route = (params?: QueryParams) => `${path}${queryParams(params)}`;
 
-    return Object.assign(route, {
-        url: path,
-        form: (options: Partial<FormConfig> = {}) => ({
-            action: route(options.query),
-            method,
-            ...options,
-        }),
-    });
+  return Object.assign(route, {
+    url: path,
+    form: (options: Partial<FormConfig> = {}) => ({
+      action: route(options.query),
+      method,
+      ...options,
+    }),
+  });
 }
 
 export const home = createRoute('/');
@@ -57,12 +48,12 @@ export const logout = createRoute('/logout', 'post');
 export const switchStore = createRoute('/stores/switch', 'post');
 
 const routes = {
-    home,
-    dashboard,
-    login,
-    register,
-    logout,
-    switchStore,
+  home,
+  dashboard,
+  login,
+  register,
+  logout,
+  switchStore,
 };
 
 export default routes;

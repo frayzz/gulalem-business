@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -51,19 +52,23 @@ class User extends Authenticatable
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<Role>
+     * @return BelongsToMany<Role>
      */
     public function roles()
     {
-        return $this->belongsToMany(Role::class)->withTimestamps();
+        return $this->morphToMany(Role::class, 'model', 'model_has_roles', 'model_id', 'role_id')
+            ->withTimestamps();
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<Store>
+     * @return BelongsToMany<Store>
      */
     public function stores()
     {
-        return $this->belongsToMany(Store::class, 'shop_user', 'user_id', 'shop_id')->withTimestamps();
+        return $this->belongsToMany(Store::class, 'user_store', 'user_id', 'store_id')
+            ->using(UserStore::class)
+            ->withPivot(['role_in_store', 'status', 'assigned_at', 'ended_at', 'metadata'])
+            ->withTimestamps();
     }
 
     /**
@@ -71,11 +76,19 @@ class User extends Authenticatable
      */
     public function accessibleStores()
     {
-        if ($this->hasRole(['owner'])) {
-            return Store::query()->orderBy('name')->get();
+        $storesQuery = $this->stores()
+            ->wherePivot('status', UserStore::STATUS_ACTIVE)
+            ->where('status', Store::STATUS_ACTIVE)
+            ->orderBy('name');
+
+        if ($this->hasRole(['owner', 'super_admin'])) {
+            return Store::query()
+                ->where('status', Store::STATUS_ACTIVE)
+                ->orderBy('name')
+                ->get();
         }
 
-        return $this->stores()->orderBy('name')->get();
+        return $storesQuery->get();
     }
 
     /**

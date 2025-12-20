@@ -29,7 +29,7 @@ class UserDemoSeeder extends Seeder
             $user = $this->seedOwner();
             $stores = $this->seedStores($user);
             $suppliers = $this->seedSuppliers();
-            $products = $this->seedProducts();
+            $products = $this->seedProducts($stores);
             $batches = $this->seedProductBatches($products, $suppliers, $stores);
             $this->seedBouquetRecipe($products);
             $customers = $this->seedCustomers($stores);
@@ -90,12 +90,14 @@ class UserDemoSeeder extends Seeder
     }
 
     /**
+     * @param  array<string, Store>  $stores
      * @return array<string, Product>
      */
-    private function seedProducts(): array
+    private function seedProducts(array $stores): array
     {
         $products = [
             'roses' => [
+                'shop_id' => $stores['main']->id,
                 'type' => Product::TYPE_FLOWER,
                 'name' => 'Роза Freedom 60 см',
                 'unit' => 'pcs',
@@ -104,6 +106,7 @@ class UserDemoSeeder extends Seeder
                 'active' => true,
             ],
             'eustoma' => [
+                'shop_id' => $stores['branch']->id,
                 'type' => Product::TYPE_FLOWER,
                 'name' => 'Эустома белая',
                 'unit' => 'pcs',
@@ -112,6 +115,7 @@ class UserDemoSeeder extends Seeder
                 'active' => true,
             ],
             'wrapping' => [
+                'shop_id' => $stores['main']->id,
                 'type' => Product::TYPE_MATERIAL,
                 'name' => 'Упаковка крафт',
                 'unit' => 'sheet',
@@ -120,6 +124,7 @@ class UserDemoSeeder extends Seeder
                 'active' => true,
             ],
             'bouquet' => [
+                'shop_id' => $stores['main']->id,
                 'type' => Product::TYPE_BOUQUET,
                 'name' => 'Букет «Красная классика»',
                 'unit' => 'pcs',
@@ -131,7 +136,10 @@ class UserDemoSeeder extends Seeder
 
         return collect($products)
             ->mapWithKeys(fn (array $data, string $key) => [
-                $key => Product::updateOrCreate(['sku' => $data['sku']], $data),
+                $key => Product::updateOrCreate(
+                    ['sku' => $data['sku'], 'shop_id' => $data['shop_id']],
+                    $data,
+                ),
             ])
             ->all();
     }

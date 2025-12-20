@@ -15,6 +15,7 @@ class Product extends Model
     public const TYPE_BOUQUET = 'bouquet';
 
     protected $fillable = [
+        'shop_id',
         'type',
         'name',
         'unit',
@@ -55,5 +56,13 @@ class Product extends Model
     public function bouquetRecipe()
     {
         return $this->hasOne(BouquetRecipe::class, 'bouquet_product_id');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<Store, Product>
+     */
+    public function store()
+    {
+        return $this->belongsTo(Store::class, 'shop_id');
     }
 }
